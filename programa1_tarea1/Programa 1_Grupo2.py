@@ -386,6 +386,7 @@ def es_escalonada(matriz):
 # (detectando una fila de ceros igualada a un número). También 
 # arma la sustitución explícita de la comprobación final.
 # =====================================================================
+
 def resolver_sistema(m, n, A, b):
     A = [[Fraction(valor) for valor in fila] for fila in A]
     b = [Fraction(valor) for valor in b]
@@ -404,8 +405,11 @@ def resolver_sistema(m, n, A, b):
     pasos.append("Forma Escalonada Reducida Final (Matriz Identidad):")
     pasos.extend(formato_matriz(aumentada, n))
 
-    # --- CORRECCIÓN DEL DETECTOR DE INCONSISTENCIA ---
-    # Buscamos directamente si quedó una fila [0 0 ... 0 | k] con k != 0
+    # --- NUEVO: CÁLCULO DE RANGO (r) Y VARIABLES (n) ---
+    pivotes_variables = [(f, c) for f, c in pivotes if c < n]
+    rango_r = len(pivotes_variables)
+    info_rn = f"> Rango de la matriz (r) = {rango_r}   |   Variables (n) = {n}"
+
     fila_inconsistente = -1
     for i, fila in enumerate(aumentada):
         if all(valor == 0 for valor in fila[:n]) and fila[n] != 0:
@@ -422,39 +426,32 @@ def resolver_sistema(m, n, A, b):
         "n": n,
     }
 
-    # Caso Inconsistente (0 = k)
     if fila_inconsistente != -1:
         valor_k = formato(aumentada[fila_inconsistente][n])
         resultado["clasificacion"] = "Inconsistente"
-        resultado["descripcion"] = f"Sistema sin solución. La fila {fila_inconsistente+1} quedó como [0 0 ... 0 | {valor_k}], que es la ecuación imposible 0 = {valor_k}."
+        resultado["descripcion"] = f"{info_rn}\n\nSistema sin solución. La fila {fila_inconsistente+1} quedó como [0 0 ... 0 | {valor_k}], que es la ecuación imposible 0 = {valor_k}."
         resultado["verificacion"] = "No hay solución que comprobar: el sistema es inconsistente."
         return resultado
 
-    pivotes_variables = [(f, c) for f, c in pivotes if c < n]
     columnas_con_pivote = [c for _, c in pivotes_variables]
     variables_libres = [c for c in range(n) if c not in columnas_con_pivote]
     resultado["variables_libres"] = variables_libres
 
-    # Caso Infinitas Soluciones
     if variables_libres:
-        cantidad_pivotes = len(pivotes_variables)
         cantidad_libres = len(variables_libres)
         resultado["clasificacion"] = "Consistente Indeterminado"
-        resultado["descripcion"] = f"Sistema con infinitas soluciones. Hay {cantidad_pivotes} pivotes para {n} variables, dejando {cantidad_libres} variables libres."
+        resultado["descripcion"] = f"{info_rn}\n\nSistema con infinitas soluciones. Hay {rango_r} pivotes para {n} variables, dejando {cantidad_libres} variables libres."
         resultado["verificacion"] = "El sistema tiene infinitas soluciones. Los valores dependen de las variables libres."
         return resultado
 
-    # Caso Solución Única
     solucion = sustitucion_regresiva(aumentada, n, pivotes_variables)
     resultado["clasificacion"] = "Consistente Determinado"
-    resultado["descripcion"] = f"Sistema con solución única. Hay un pivote en cada una de las {n} columns, sin variables libres."
+    resultado["descripcion"] = f"{info_rn}\n\nSistema con solución única. Hay un pivote en cada una de las {n} columnas, sin variables libres."
     resultado["solucion"] = solucion
     
-    # Comprobación explícita (número a número)
     texto_verificacion = verificar(m, n, A, b, solucion)
     resultado["verificacion"] = texto_verificacion
     
-    # Inyectar la comprobación al final del panel de Procedimiento
     resultado["pasos"].append("")
     resultado["pasos"].append("========================================")
     resultado["pasos"].append("COMPROBACIÓN DEL SISTEMA (PASO FINAL):")
