@@ -404,10 +404,7 @@ def resolver_sistema(m, n, A, b):
     pasos.append("Forma Escalonada Reducida Final (Matriz Identidad):")
     pasos.extend(formato_matriz(aumentada, n))
 
-<<<<<<< Updated upstream
     # --- CORRECCIÓN DEL DETECTOR DE INCONSISTENCIA ---
-=======
->>>>>>> Stashed changes
     # Buscamos directamente si quedó una fila [0 0 ... 0 | k] con k != 0
     fila_inconsistente = -1
     for i, fila in enumerate(aumentada):
@@ -508,19 +505,16 @@ def verificar(m, n, A, b, solucion):
     lineas.append("La solución satisface todas las ecuaciones." if todo_correcto else "La solución NO satisface el sistema.")
     return "\n".join(lineas)
 
-<<<<<<< Updated upstream
 EJEMPLOS = {
     "unica": {"titulo": "Solución única", "ecuaciones": "x1 + x2 + x3 = 6\n2x1 - x2 + x3 = 3\nx1 + 2x2 - x3 = 2"},
     "infinitas": {"titulo": "Infinitas", "ecuaciones": "x1 + x2 + x3 = 1\n2x1 + 2x2 + 2x3 = 2"},
     "sin_solucion": {"titulo": "Sin solución", "ecuaciones": "x1 - 2x2 + x3 = 4\n2x1 - 4x2 + 2x3 = 5\n3x1 + x2 - x3 = 2"},
 }
-=======
 # Sistema que aparece escrito en la caja al abrir la calculadora, como
 # guía del formato que se espera.
 SISTEMA_INICIAL = ("x1 + x2 + x3 = 6\n"
                    "2x1 - x2 + x3 = 3\n"
                    "x1 + 2x2 - x3 = 2")
->>>>>>> Stashed changes
 
 
 # =====================================================================
