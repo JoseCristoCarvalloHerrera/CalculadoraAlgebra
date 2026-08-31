@@ -426,8 +426,22 @@ def resolver_sistema(m, n, A, b):
     }
 
     # Caso Inconsistente (0 = k)
+<<<<<<< HEAD
     if fila_inconsistente != -1:
         valor_k = formato(aumentada[fila_inconsistente][n])
+=======
+    # Se busca directamente la fila [0 0 ... 0 | k] con k distinto de cero.
+    # No se puede usar "n in columnas_pivote" porque el escalonamiento se
+    # detiene antes de la columna b, así que esa columna nunca aparece
+    # entre los pivotes.
+    fila_k = None
+    for i, fila in enumerate(aumentada):
+        if all(valor == 0 for valor in fila[:n]) and fila[n] != 0:
+            fila_k = i
+            break
+    if fila_k is not None:
+        valor_k = formato(aumentada[fila_k][n])
+>>>>>>> origin/main
         resultado["clasificacion"] = "Inconsistente"
         resultado["descripcion"] = f"Sistema sin solución. La fila {fila_inconsistente+1} quedó como [0 0 ... 0 | {valor_k}], que es la ecuación imposible 0 = {valor_k}."
         resultado["verificacion"] = "No hay solución que comprobar: el sistema es inconsistente."
@@ -508,6 +522,7 @@ def verificar(m, n, A, b, solucion):
     lineas.append("La solución satisface todas las ecuaciones." if todo_correcto else "La solución NO satisface el sistema.")
     return "\n".join(lineas)
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 EJEMPLOS = {
     "unica": {"titulo": "Solución única", "ecuaciones": "x1 + x2 + x3 = 6\n2x1 - x2 + x3 = 3\nx1 + 2x2 - x3 = 2"},
@@ -515,12 +530,17 @@ EJEMPLOS = {
     "sin_solucion": {"titulo": "Sin solución", "ecuaciones": "x1 - 2x2 + x3 = 4\n2x1 - 4x2 + 2x3 = 5\n3x1 + x2 - x3 = 2"},
 }
 =======
+=======
+>>>>>>> origin/main
 # Sistema que aparece escrito en la caja al abrir la calculadora, como
 # guía del formato que se espera.
 SISTEMA_INICIAL = ("x1 + x2 + x3 = 6\n"
                    "2x1 - x2 + x3 = 3\n"
                    "x1 + 2x2 - x3 = 2")
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> origin/main
 
 
 # =====================================================================
@@ -538,7 +558,11 @@ class MenuPrincipal:
         
         # La ventana se adapta a la pantalla del equipo: pide el tamaño
         # cómodo, pero nunca más de lo que cabe. Con un tamaño fijo pequeño
+<<<<<<< HEAD
         # la matriz queda cortada y había que desplazarse para verla.
+=======
+        # la matriz quedaba cortada y había que desplazarse para verla.
+>>>>>>> origin/main
         ancho = min(1300, self.raiz.winfo_screenwidth() - 80)
         alto = min(840, self.raiz.winfo_screenheight() - 120)
         self.raiz.geometry(f"{max(1120, ancho)}x{max(700, alto)}")
@@ -787,7 +811,12 @@ class CalculadoraApp:
 
         botones = tk.Frame(cont, bg=TARJETA)
         botones.grid(row=2, column=0, columnspan=5, sticky="w", pady=(8, 0))
+<<<<<<< HEAD
         self._boton_secundario(botones, "Limpiar", self._limpiar_celdas, 0, 0)
+=======
+        self._boton_secundario(botones, "Actualizar matriz", self._construir_grid_matriz, 0, 0)
+        self._boton_secundario(botones, "Limpiar", self._limpiar_celdas, 0, 1)
+>>>>>>> origin/main
 
     def _leer_dimension(self, variable, por_defecto):
         try: valor = int(str(variable.get()).strip())
@@ -805,7 +834,11 @@ class CalculadoraApp:
         self.celdas, self.entradas = {}, {}
         self.filas_actuales, self.columnas_actuales = m, n
 
+<<<<<<< HEAD
         # **** La matriz se dibuja como una tabla continua ****
+=======
+        # ---- La matriz se dibuja como una tabla continua ----
+>>>>>>> origin/main
         # Las casillas no llevan borde propio: entre ellas se intercalan
         # marcos de un píxel que hacen de líneas. Las columnas pares de la
         # cuadrícula son líneas y las impares son casillas; lo mismo con
@@ -816,11 +849,18 @@ class CalculadoraApp:
         #   columna 2j+1   casillas de la col. j  fila 1        borde superior
         #   columna 2n     barra que separa A|b   fila 2i+2     ecuación i+1
         #   columna 2n+2   borde derecho          fila 2m+1     borde inferior
+<<<<<<< HEAD
 
         total_columnas = n + 1
         columna_celda = lambda j: 2 * j + 1
         filas_del_marco = 2 * m + 1
 
+=======
+        total_columnas = n + 1
+        columna_celda = lambda j: 2 * j + 1
+        filas_del_marco = 2 * m + 1
+
+>>>>>>> origin/main
         # Encabezados de columna, por encima del marco
         for j in range(n):
             tk.Label(self.frame_matriz, text=f"x{j+1}", font=self.fuente_sub,
