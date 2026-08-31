@@ -255,7 +255,7 @@ def escalonar(matriz, col_barra=None):
             pasos.extend(formato_matriz(matriz, col_barra))
             pasos.append("")
 
-        # Novedad: Convertir el pivote a 1 (Normalizar)
+        # Normalizar: Convertir el pivote a 1
         pivote_val = matriz[fila_pivote][col]
         if pivote_val != 1:
             matriz[fila_pivote] = [x / pivote_val for x in matriz[fila_pivote]]
@@ -289,7 +289,7 @@ def escalonar(matriz, col_barra=None):
             pasos.append("")
         f += 1
 
-    # Novedad: Fase 2 (Gauss-Jordan) -> Ceros por encima de la diagonal
+    # Fase 2 (Gauss-Jordan) -> Ceros por encima de la diagonal
     if len(pivotes) > 0:
         pasos.append("--- FASE 2: GAUSS-JORDAN (Ceros arriba de los pivotes) ---")
         pasos.append("")
@@ -356,7 +356,14 @@ def resolver_sistema(m, n, A, b):
     pasos.append("Forma Escalonada Reducida Final (Matriz Identidad):")
     pasos.extend(formato_matriz(aumentada, n))
 
-    columnas_pivote = [c for _, c in pivotes]
+    # --- CORRECCIÓN DEL DETECTOR DE INCONSISTENCIA ---
+    # Buscamos directamente si quedó una fila [0 0 ... 0 | k] con k != 0
+    fila_inconsistente = -1
+    for i, fila in enumerate(aumentada):
+        if all(valor == 0 for valor in fila[:n]) and fila[n] != 0:
+            fila_inconsistente = i
+            break
+
     resultado = {
         "pasos": pasos,
         "escalonada": [fila[:] for fila in aumentada],
@@ -368,15 +375,10 @@ def resolver_sistema(m, n, A, b):
     }
 
     # Caso Inconsistente (0 = k)
-    if n in columnas_pivote:
-        fila_k = 0
-        for i, fila in enumerate(aumentada):
-            if all(valor == 0 for valor in fila[:n]) and fila[n] != 0:
-                fila_k = i
-                break
-        valor_k = formato(aumentada[fila_k][n])
+    if fila_inconsistente != -1:
+        valor_k = formato(aumentada[fila_inconsistente][n])
         resultado["clasificacion"] = "Inconsistente"
-        resultado["descripcion"] = f"Sistema sin solución. La fila {fila_k+1} quedó como [0 0 ... 0 | {valor_k}], que es la ecuación imposible 0 = {valor_k}."
+        resultado["descripcion"] = f"Sistema sin solución. La fila {fila_inconsistente+1} quedó como [0 0 ... 0 | {valor_k}], que es la ecuación imposible 0 = {valor_k}."
         resultado["verificacion"] = "No hay solución que comprobar: el sistema es inconsistente."
         return resultado
 
@@ -397,7 +399,7 @@ def resolver_sistema(m, n, A, b):
     # Caso Solución Única
     solucion = sustitucion_regresiva(aumentada, n, pivotes_variables)
     resultado["clasificacion"] = "Consistente Determinado"
-    resultado["descripcion"] = f"Sistema con solución única. Hay un pivote en cada una de las {n} columnas, sin variables libres."
+    resultado["descripcion"] = f"Sistema con solución única. Hay un pivote en cada una de las {n} columns, sin variables libres."
     resultado["solucion"] = solucion
     
     # Comprobación explícita (número a número)
@@ -458,7 +460,7 @@ def verificar(m, n, A, b, solucion):
 EJEMPLOS = {
     "unica": {"titulo": "Solución única", "ecuaciones": "x1 + x2 + x3 = 6\n2x1 - x2 + x3 = 3\nx1 + 2x2 - x3 = 2"},
     "infinitas": {"titulo": "Infinitas", "ecuaciones": "x1 + x2 + x3 = 1\n2x1 + 2x2 + 2x3 = 2"},
-    "sin_solucion": {"titulo": "Sin solución", "ecuaciones": "x1 + x2 = 1\nx1 + x2 = 3"},
+    "sin_solucion": {"titulo": "Sin solución", "ecuaciones": "x1 - 2x2 + x3 = 4\n2x1 - 4x2 + 2x3 = 5\n3x1 + x2 - x3 = 2"},
 }
 
 
@@ -821,14 +823,14 @@ class CalculadoraApp:
         color = EXITO if clasificacion == "Consistente Determinado" else ADVERTENCIA if clasificacion == "Consistente Indeterminado" else ERROR
 
         # ================= RESULTADO =================
-        sub = self._sub_tarjeta("CLASIFICACIÓN", TEXTO_SUAVE)
+        sub = self._sub_tarjeta("CLASIFICACIÓN DEL SISTEMA", TEXTO_SUAVE)
         cartel = tk.Frame(sub, bg=color, padx=14, pady=10)
         cartel.pack(fill="x", pady=(0, 4))
         self._texto_ajustable(tk.Label(cartel, text=clasificacion.upper(), font=self.fuente_cartel, bg=color, fg=FONDO)).pack(fill="x")
         self._texto_ajustable(tk.Label(sub, text=resultado["descripcion"], font=self.fuente_body, bg=TARJETA, fg=TEXTO)).pack(fill="x", pady=(0, 6))
 
         if resultado["solucion"] is not None:
-            sub2 = self._sub_tarjeta("SOLUCIÓN ENCONTRADA", ACENTO)
+            sub2 = self._sub_tarjeta("SOLUCIÓN DEL SISTEMA", ACENTO)
             contenedor = tk.Frame(sub2, bg=FONDO, padx=12, pady=10)
             contenedor.pack(fill="x", pady=(0, 8))
             texto_solucion = "     ".join(f"x{i+1} = {formato(v)}" for i, v in enumerate(resultado["solucion"]))
@@ -840,7 +842,7 @@ class CalculadoraApp:
             tk.Label(sub2, text="Soluciones dadas en función de:", font=self.fuente_body, bg=TARJETA, fg=TEXTO_SUAVE).pack(fill="x")
             self._texto_ajustable(tk.Label(sub2, text=nombres, font=self.fuente_big, bg=TARJETA, fg=TEXTO)).pack(fill="x", pady=(4, 8))
 
-        sub3 = self._sub_tarjeta("COMPROBACIÓN", EXITO)
+        sub3 = self._sub_tarjeta("VERIFICACIÓN AUTOMÁTICA", EXITO)
         self._texto_ajustable(tk.Label(sub3, text=resultado["verificacion"], font=self.fuente_mono, bg=TARJETA, fg=TEXTO, justify="left", anchor="w")).pack(fill="x", pady=(0, 8))
 
         # ================= PROCEDIMIENTO =================
