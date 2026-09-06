@@ -1,4 +1,4 @@
-# -- coding: utf-8 --
+# -*- coding: utf-8 -*-
 """
 =====================================================================
  PROGRAMA 1 - GRUPO 2
@@ -113,6 +113,30 @@ def formato(valor):
     if valor.denominator == 1:
         return str(valor.numerator)
     return f"{valor.numerator}/{valor.denominator}"
+
+
+# Usamos los dígitos en subíndice del propio Unicode (₀₁₂₃...), 
+# que Tkinter ya sabe dibujar más pequeños.
+_TABLA_SUBINDICES = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
+
+def con_subindice(nombre):
+    """Convierte el número final de un nombre de variable en subíndice.
+    'x1' -> 'x₁', 'x12' -> 'x₁₂'. Si el nombre no termina en dígitos
+    (por ejemplo una variable escrita como 'x' o 'z' sola), se deja tal
+    cual, porque no hay número que convertir."""
+    corte = len(nombre)
+    while corte > 0 and nombre[corte - 1].isdigit():
+        corte -= 1
+    letras, numero = nombre[:corte], nombre[corte:]
+    if numero:
+        return letras + numero.translate(_TABLA_SUBINDICES)
+    return nombre
+
+
+def nombre_variable(indice_base_uno):
+    """Nombre de columna para mostrar en la interfaz, ya con su
+    subíndice pequeño: nombre_variable(1) -> 'x₁'."""
+    return con_subindice(f"x{indice_base_uno}")
 
 
 def formato_matriz(matriz, col_barra=None, sangria="    "):
@@ -456,16 +480,16 @@ def resolver_sistema(m, n, A, b):
     pasos.extend(formato_matriz(aumentada, n))
 
 
-    # --- EXTRACCIÓN DE DATOS DE LA PIZARRA ---
+    # --- EXTRACCIÓN ---
     pivotes_variables = [(f, c) for f, c in pivotes if c < n]
     rango_A = len(pivotes_variables)
    
     columnas_pivote = [c + 1 for _, c in pivotes_variables]
-    vars_basicas = [f"x{c + 1}" for _, c in pivotes_variables]
+    vars_basicas = [nombre_variable(c + 1) for _, c in pivotes_variables]
    
     # Identificar variables libres
     vars_libres_idx = [c for c in range(n) if c not in [col - 1 for col in columnas_pivote]]
-    vars_libres = [f"x{c + 1}" for c in vars_libres_idx]
+    vars_libres = [nombre_variable(c + 1) for c in vars_libres_idx]
     cantidad_libres = len(vars_libres)
 
 
@@ -521,7 +545,7 @@ def resolver_sistema(m, n, A, b):
        
         for c in range(n):
             if c in vars_libres_idx:
-                parametrizada.append(f"x{c+1} = x{c+1}  <-- (Libre)")
+                parametrizada.append(f"{nombre_variable(c+1)} = {nombre_variable(c+1)}  <-- (Libre)")
                 vectorial_const.append("0")
                 for v in vars_libres_idx:
                     vectorial_vars[v].append("1" if v == c else "0")
@@ -533,25 +557,25 @@ def resolver_sistema(m, n, A, b):
                 for v in vars_libres_idx:
                     coef = -aumentada[f][v]
                     if coef != 0:
-                        eq_params.append(f"{formato(coef)}x{v+1}")
+                        eq_params.append(f"{formato(coef)}{nombre_variable(v+1)}")
                         vectorial_vars[v].append(formato(coef))
                     else:
                         vectorial_vars[v].append("0")
                
                 str_params = " + ".join(eq_params).replace("+ -", "- ")
                 if termino_ind != 0 or not str_params:
-                    texto_eq = f"x{c+1} = {formato(termino_ind)}" + (f" + {str_params}" if str_params else "")
+                    texto_eq = f"{nombre_variable(c+1)} = {formato(termino_ind)}" + (f" + {str_params}" if str_params else "")
                 else:
-                    texto_eq = f"x{c+1} = {str_params}"
+                    texto_eq = f"{nombre_variable(c+1)} = {str_params}"
                 parametrizada.append(texto_eq.replace("+ -", "- "))
                 vectorial_const.append(formato(termino_ind))
        
         # Armar la Forma Vectorial renglón por renglón
         lineas_vectorial = ["\n--- SOLUCIÓN GENERAL (FORMA VECTORIAL) ---"]
         for i in range(n):
-            linea = f"[x{i+1}] = [{vectorial_const[i]:>4}]"
+            linea = f"[{nombre_variable(i+1)}] = [{vectorial_const[i]:>4}]"
             for v in vars_libres_idx:
-                linea += f" + x{v+1} * [{vectorial_vars[v][i]:>4}]"
+                linea += f" + {nombre_variable(v+1)} * [{vectorial_vars[v][i]:>4}]"
             lineas_vectorial.append(linea)
 
 
@@ -992,7 +1016,7 @@ class CalculadoraApp:
 
         # Encabezados de columna, por encima del marco
         for j in range(n):
-            tk.Label(self.frame_matriz, text=f"x{j+1}", font=self.fuente_sub,
+            tk.Label(self.frame_matriz, text=nombre_variable(j+1), font=self.fuente_sub,
                      bg=TARJETA, fg=TEXTO_SUAVE).grid(row=0, column=columna_celda(j), pady=(0, 4))
         tk.Label(self.frame_matriz, text="b", font=self.fuente_sub,
                  bg=TARJETA, fg=ACENTO).grid(row=0, column=columna_celda(n), pady=(0, 4))
@@ -1066,7 +1090,7 @@ class CalculadoraApp:
                 for j in range(n):
                     try: fila.append(a_numero(self.celdas[(i, j)].get()))
                     except ValueError as error:
-                        self._mostrar_error(f"Revisa la casilla fila {i+1}, columna x{j+1}.", i, j)
+                        self._mostrar_error(f"Revisa la casilla fila {i+1}, columna {nombre_variable(j+1)}.", i, j)
                         return
                 A.append(fila)
                 try: b.append(a_numero(self.celdas[(i, n)].get()))
@@ -1140,7 +1164,7 @@ class CalculadoraApp:
         self._texto_ajustable(tk.Label(sub, text=resultado["descripcion"], font=self.fuente_body, bg=TARJETA, fg=TEXTO)).pack(fill="x", pady=(0, 6))
 
 
-        # --- TABLA DE DATOS DE LA PIZARRA (TEOREMA DE ROUCHÉ) ---
+        # --- TABLA DE DATOS (TEOREMA DE ROUCHÉ) ---
         marco_tabla = tk.Frame(sub, bg="#00bcd4", bd=1)
         marco_tabla.pack(pady=10)
 
@@ -1161,12 +1185,12 @@ class CalculadoraApp:
             sub2 = self._sub_tarjeta("SOLUCIÓN DEL SISTEMA", ACENTO)
             contenedor = tk.Frame(sub2, bg=FONDO, padx=12, pady=10)
             contenedor.pack(fill="x", pady=(0, 8))
-            texto_solucion = "     ".join(f"x{i+1} = {formato(v)}" for i, v in enumerate(resultado["solucion"]))
+            texto_solucion = "     ".join(f"{nombre_variable(i+1)} = {formato(v)}" for i, v in enumerate(resultado["solucion"]))
             self._texto_ajustable(tk.Label(contenedor, text=texto_solucion, font=self.fuente_big, bg=FONDO, fg=TEXTO)).pack(fill="x")
        
         elif clasificacion == "Consistente Indeterminado":
             sub2 = self._sub_tarjeta("VARIABLES LIBRES", ADVERTENCIA)
-            nombres = "   ".join(f"x{c+1}" for c in resultado["variables_libres"])
+            nombres = "   ".join(nombre_variable(c+1) for c in resultado["variables_libres"])
             tk.Label(sub2, text="Soluciones dadas en función de:", font=self.fuente_body, bg=TARJETA, fg=TEXTO_SUAVE).pack(fill="x")
             self._texto_ajustable(tk.Label(sub2, text=nombres, font=self.fuente_big, bg=TARJETA, fg=TEXTO)).pack(fill="x", pady=(4, 8))
 
@@ -1294,4 +1318,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
