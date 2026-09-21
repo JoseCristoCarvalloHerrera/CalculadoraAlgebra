@@ -1618,17 +1618,17 @@ class MenuPrincipal:
         tk.Label(self.frame_menu, text="Selecciona el módulo en el que quieres trabajar:", font=("Montserrat", 13), bg=FONDO, fg=TEXTO).pack(pady=(0, 20))
        
         btn_matrices = tk.Button(self.frame_menu, text="Ecuaciones Matriciales (Ax = b)", font=("Montserrat", 13, "bold"),
-                                 bg=ACENTO, fg=FONDO, padx=30, pady=15, relief="flat", cursor="hand2",
+                                 bg=ACENTO, fg=FONDO, width=32, pady=15, relief="flat", cursor="hand2",
                                  activebackground=ACENTO_HOVER, activeforeground=FONDO, command=self.abrir_calculadora)
         btn_matrices.pack(pady=10)
 
         btn_vectores = tk.Button(self.frame_menu, text="Vectores en ℝⁿ", font=("Montserrat", 13, "bold"),
-                                 bg=ACENTO, fg=FONDO, padx=30, pady=15, relief="flat", cursor="hand2",
+                                 bg=ACENTO, fg=FONDO, width=32, pady=15, relief="flat", cursor="hand2",
                                  activebackground=ACENTO_HOVER, activeforeground=FONDO, command=self.abrir_vectores)
         btn_vectores.pack(pady=10)
 
         btn_matriz_ops = tk.Button(self.frame_menu, text="Operaciones Matriciales", font=("Montserrat", 13, "bold"),
-                                   bg=ACENTO, fg=FONDO, padx=30, pady=15, relief="flat", cursor="hand2",
+                                   bg=ACENTO, fg=FONDO, width=32, pady=15, relief="flat", cursor="hand2",
                                    activebackground=ACENTO_HOVER, activeforeground=FONDO, command=self.abrir_matrices_ops)
         btn_matriz_ops.pack(pady=10)
 
