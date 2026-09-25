@@ -785,11 +785,12 @@ def formato_vector(v):
     return "( " + ",  ".join(formato(x) for x in v) + " )"
 
 
-def _formato_suma_lineal(coefs, nombre_base="v"):
+def _formato_suma_lineal(coefs, nombre_base="v", ocultar_unos=True):
     """Construye el texto de una combinación lineal, por ejemplo
     '3·v₁ + 2·v₂ − v₃'. Recibe la lista de coeficientes y el nombre base
     de las variables ('v', 'a', 'x', ...). Escribe el signo + o − según
-    el signo de cada coeficiente y omite el coeficiente si es 1 ó −1."""
+    el signo de cada coeficiente y omite el coeficiente si es 1 ó −1
+    (a menos que ocultar_unos sea False, útil para mostrar los escalares)."""
     terminos = []
     for i, c in enumerate(coefs):
         if c == 0:
@@ -800,11 +801,25 @@ def _formato_suma_lineal(coefs, nombre_base="v"):
         else:
             signo = " − " if terminos else "−"
         c_abs = abs(c)
-        if c_abs == 1:
+        if c_abs == 1 and ocultar_unos:
             terminos.append(signo + nombre)
         else:
             terminos.append(signo + formato(c_abs) + "·" + nombre)
     return "".join(terminos) if terminos else "0"
+
+
+def _expansion_por_columnas(coefs, columnas, nombre_base="a", resultado=None):
+    """Líneas para mostrar un producto matriz-vector como combinación lineal
+    explícita de las columnas: el valor de cada columna, la fórmula con los
+    escalares, la suma desarrollada y el vector resultante."""
+    lineas = [con_subindice(nombre_base + str(i + 1)) + " = "
+              + formato_vector(columnas[i]) for i in range(len(coefs))]
+    formula = _formato_suma_lineal(coefs, nombre_base, ocultar_unos=False)
+    suma = " + ".join(formato_vector(col) for col in columnas)
+    if resultado is not None:
+        formula += " = " + suma + " = " + formato_vector(resultado)
+    lineas.append(formula)
+    return lineas
 
 
 def _mcd(a, b):
@@ -886,11 +901,10 @@ def matriz_por_vector(A, x):
         b[i] = A[i][0]·x[0] + A[i][1]·x[1] + ... + A[i][n-1]·x[n-1].
     Requiere que el número de COLUMNAS de A sea igual al número de ENTRADAS
     de x; si no, la operación no está definida."""
-    if not A or not x:
-        raise ValueError("Debe ingresar la matriz A y el vector x.")
-    if not A[0]:
-        raise ValueError("La matriz A no puede tener filas vacías.")
-    n_columnas = len(A[0])
+    _validar_matriz(A, "A")
+    if not x:
+        raise ValueError("Debe ingresar el vector x.")
+    _, n_columnas = _leer_dimensiones(A)
     if n_columnas != len(x):
         raise ValueError(
             "No se puede calcular A·x: la matriz A tiene " + str(n_columnas)
@@ -906,6 +920,75 @@ def matriz_por_vector(A, x):
     return resultado
 
 
+def vectores_iguales(a, b, tolerancia=1e-9):
+    """Compara dos vectores: exacto para enteros/fracciones y con tolerancia
+    solo si alguno de los valores es float, por errores de representación."""
+    validar_dimensiones(a, b)
+    for x, y in zip(a, b):
+        if x == y:
+            continue
+        if isinstance(x, float) or isinstance(y, float):
+            if not abs(float(x) - float(y)) <= tolerancia:
+                return False
+        elif x != y:
+            return False
+    return True
+
+
+def pasos_matriz_por_vector(A, x):
+    """Explica Ax usando la regla fila-vector y fracciones exactas."""
+    resultado = matriz_por_vector(A, x)
+    pasos = ["Producto matriz-vector Ax por regla fila-vector:"]
+    for i, fila in enumerate(A):
+        terminos = ["(" + formato(fila[j]) + ")·(" + formato(x[j]) + ")"
+                    for j in range(len(x))]
+        pasos.append("Fila " + str(i + 1) + ": " + " + ".join(terminos)
+                     + " = " + formato(resultado[i]))
+    return pasos
+
+
+def verificar_aditividad_matriz_vector(A, u, v):
+    """Verifica A(u+v)=Au+Av calculando y devolviendo ambos caminos."""
+    _validar_matriz(A, "A")
+    _, n = _leer_dimensiones(A)
+    if len(u) != n or len(v) != n:
+        raise ValueError("u y v deben tener " + str(n)
+                         + " componente(s), igual al número de columnas de A.")
+    u_mas_v = sumar_vectores(u, v)
+    izquierda = matriz_por_vector(A, u_mas_v)
+    Au = matriz_por_vector(A, u)
+    Av = matriz_por_vector(A, v)
+    derecha = sumar_vectores(Au, Av)
+    return {
+        "u_mas_v": u_mas_v,
+        "izquierda": izquierda,
+        "Au": Au,
+        "Av": Av,
+        "derecha": derecha,
+        "se_cumple": vectores_iguales(izquierda, derecha),
+    }
+
+
+def verificar_homogeneidad_matriz_vector(A, c, u):
+    """Verifica A(cu)=c(Au) mostrando los dos lados de la igualdad."""
+    _validar_matriz(A, "A")
+    _, n = _leer_dimensiones(A)
+    if len(u) != n:
+        raise ValueError("u debe tener " + str(n)
+                         + " componente(s), igual al número de columnas de A.")
+    cu = escalar_por_vector(c, u)
+    izquierda = matriz_por_vector(A, cu)
+    Au = matriz_por_vector(A, u)
+    derecha = escalar_por_vector(c, Au)
+    return {
+        "cu": cu,
+        "izquierda": izquierda,
+        "Au": Au,
+        "derecha": derecha,
+        "se_cumple": vectores_iguales(izquierda, derecha),
+    }
+
+
 # =====================================================================
 # BLOQUE M1: OPERACIONES MATRICIALES BÁSICAS
 # Suma, resta, escalar y multiplicación A(m×n) · B(n×p) con bucles
@@ -914,7 +997,7 @@ def matriz_por_vector(A, x):
 # =====================================================================
 
 def _es_matriz_valida(M):
-    """Verifica que M sea una lista no vacía de listas del mismo ancho."""
+    """Verifica que M  sea una lista no vacía de listas del mismo ancho."""
     if not isinstance(M, list) or not M:
         return False
     filas = len(M)
@@ -1511,7 +1594,7 @@ class VectoresApp:
     def _ajustar_textos(self, ancho_disponible=None):
         if ancho_disponible is None:
             ancho_disponible = self.lienzo_resultado.winfo_width()
-        ancho = max(240, ancho_disponible - 56)
+        ancho = max(120, ancho_disponible - 56)
         for etiqueta in self.etiquetas_ajustables:
             try:
                 etiqueta.configure(wraplength=ancho)
@@ -1558,16 +1641,18 @@ class VectoresApp:
                          wraplength=440, justify="left", anchor="w"
                          )).pack(anchor="w", pady=(0, 4))
 
-        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA)
+        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA,
+                                          highlightbackground=BOTON_SEC,
+                                          highlightthickness=1, bd=0)
         tk.Label(self.sub_procedimiento, text="PROCESO DE ELIMINACIÓN (GAUSS-JORDAN)",
-                 font=self.fuente_encab, bg=TARJETA, fg=TEXTO_SUAVE, anchor="w"
-                 ).pack(fill="x", padx=2, pady=(6, 2))
+                 font=self.fuente_encab, bg=TARJETA, fg=TEXTO, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(10, 6))
         texto_proc = "\n".join(pasos) if pasos else "(sin procedimiento)"
         self._texto_ajustable(
             tk.Label(self.sub_procedimiento, text=texto_proc,
                      font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
-                     justify="left", anchor="w"
-                     )).pack(fill="x", pady=(0, 10))
+                     justify="left", anchor="nw"
+                     )).pack(fill="x", padx=14, pady=(0, 10))
 
         self.raiz.update_idletasks()
         self._ajustar_textos()
@@ -1584,6 +1669,7 @@ class VectoresApp:
             self.boton_procedimiento.configure(text="Ocultar procedimiento")
             self.procedimiento_visible = True
         self.raiz.update_idletasks()
+        self._ajustar_textos()
         self.lienzo_resultado.configure(scrollregion=self.lienzo_resultado.bbox("all"))
 
     def _mostrar_error(self, mensaje):
@@ -1802,7 +1888,7 @@ class CalculadoraApp:
     def _ajustar_textos(self, ancho_disponible=None):
         if ancho_disponible is None:
             ancho_disponible = self.lienzo_resultado.winfo_width()
-        ancho = max(240, ancho_disponible - 56)
+        ancho = max(120, ancho_disponible - 56)
         for etiqueta in self.etiquetas_ajustables:
             try: etiqueta.configure(wraplength=ancho)
             except tk.TclError: pass
@@ -2149,10 +2235,18 @@ class CalculadoraApp:
 
 
         # ================= PROCEDIMIENTO =================
-        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA)
-        tk.Label(self.sub_procedimiento, text="PROCESO DE ELIMINACIÓN (GAUSS-JORDAN)", font=self.fuente_encab, bg=TARJETA, fg=TEXTO_SUAVE, anchor="w").pack(fill="x", padx=2, pady=(6, 2))
-       
-        self._texto_ajustable(tk.Label(self.sub_procedimiento, text="\n".join(resultado["pasos"]), font=self.fuente_mono, bg=TARJETA, fg=TEXTO, justify="left", anchor="w")).pack(fill="x", pady=(0, 10))
+        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA,
+                                          highlightbackground=BOTON_SEC,
+                                          highlightthickness=1, bd=0)
+        tk.Label(self.sub_procedimiento, text="PROCESO DE ELIMINACIÓN (GAUSS-JORDAN)",
+                 font=self.fuente_encab, bg=TARJETA, fg=TEXTO, anchor="w"
+                 ).pack(fill="x", padx=14, pady=(10, 6))
+
+        self._texto_ajustable(tk.Label(self.sub_procedimiento,
+                                       text="\n".join(resultado["pasos"]),
+                                       font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
+                                       justify="left", anchor="nw"
+                                       )).pack(fill="x", padx=14, pady=(0, 10))
 
 
         self.procedimiento_visible = False
@@ -2173,6 +2267,7 @@ class CalculadoraApp:
             self.boton_procedimiento.configure(text="Ocultar procedimiento")
             self.procedimiento_visible = True
         self.raiz.update_idletasks()
+        self._ajustar_textos()
         self.lienzo_resultado.configure(scrollregion=self.lienzo_resultado.bbox("all"))
 
 
@@ -2194,8 +2289,12 @@ class MatricesOpsApp:
         self.var_mb = tk.StringVar(value="2")   # filas de B
         self.var_nb = tk.StringVar(value="2")   # columnas de B
         self.var_escalar = tk.StringVar(value="2")
+        self.var_modo_ax = tk.StringVar(value="Calcular A·x")
+        self.var_escalar_ax = tk.StringVar(value="2")
         self.celdas_A = {}
         self.celdas_B = {}
+        self.celdas_vectores_ax = {}
+        self.valores_vectores_ax = {}
         self.celda_con_error = None
 
         self.fuente_titulo = tkfont.Font(family="Montserrat", size=22, weight="bold")
@@ -2218,6 +2317,7 @@ class MatricesOpsApp:
 
         self._construir_ui()
         self._construir_grids()
+        self._construir_grid_vectores_ax()
 
     def _construir_ui(self):
         tk.Button(self.marco_principal, text="← Volver al Menú", font=self.fuente_body,
@@ -2229,8 +2329,8 @@ class MatricesOpsApp:
                  font=self.fuente_titulo, bg=FONDO, fg=TEXTO
                  ).grid(row=1, column=0, columnspan=2, sticky="w", padx=34, pady=(5, 4))
         tk.Label(self.marco_principal,
-                 text="Sumar, restar, multiplicar por escalar y producto A·B "
-                      "(se validan siempre las dimensiones)",
+                 text="Operaciones con matrices, producto matriz-vector Ax y "
+                      "propiedades de linealidad, con dimensiones validadas.",
                  font=self.fuente_sub, bg=FONDO, fg=TEXTO_SUAVE
                  ).grid(row=2, column=0, columnspan=2, sticky="w", padx=34, pady=(0, 12))
 
@@ -2272,6 +2372,7 @@ class MatricesOpsApp:
         self.frame_B.pack(fill="both", expand=True, padx=18, pady=(0, 8))
 
         self._llenar_botones(self.frame_izq)
+        self._llenar_tarjeta_producto_vectorial(self.frame_izq)
 
         # ---- panel derecho (resultados) ----
         panel_der = tk.Frame(self.marco_principal, bg=FONDO)
@@ -2290,8 +2391,8 @@ class MatricesOpsApp:
                                              command=self._alternar_procedimiento)
 
         self.aviso_vacio = tk.Label(tarjeta_res,
-                                    text="Completa las matrices A y B y elige una operación.\n"
-                                         "Puedes usar enteros, decimales o fracciones.",
+                                    text="Completa A y B para operar con matrices, o usa A\n"
+                                         "con un vector para calcular Ax y verificar propiedades.",
                                     font=self.fuente_body, bg=TARJETA, fg=TEXTO_SUAVE,
                                     justify="left", anchor="nw", padx=18, pady=14)
         self.aviso_vacio.pack(fill="both", expand=True)
@@ -2347,6 +2448,11 @@ class MatricesOpsApp:
         variable.set(str(valor))
         return valor
 
+    def _reconstruir_entradas(self):
+        """Actualiza A/B y los vectores auxiliares manteniendo lo escrito."""
+        self._construir_grids()
+        self._construir_grid_vectores_ax()
+
     def _llenar_cabecera_matriz(self, titulo, var_m, var_n, padre, letra):
         """Construye una tarjeta con título, spinboxes de dimensiones y un
         botón pequeño «＋» que agrega una fila y una columna a la vez.
@@ -2362,18 +2468,18 @@ class MatricesOpsApp:
         tk.Spinbox(cont, from_=1, to=MAX_DIMENSION, textvariable=var_m,
                    font=self.fuente_body, width=4, justify="center", bg="#FFFFFF",
                    fg=TEXTO, relief="solid", bd=1, highlightthickness=0,
-                   command=self._construir_grids).grid(row=1, column=1, sticky="w", padx=(0, 16))
+                   command=self._reconstruir_entradas).grid(row=1, column=1, sticky="w", padx=(0, 16))
         tk.Label(cont, text="Columnas", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).grid(row=1, column=2, sticky="w", padx=(0, 6))
         tk.Spinbox(cont, from_=1, to=MAX_DIMENSION, textvariable=var_n,
                    font=self.fuente_body, width=4, justify="center", bg="#FFFFFF",
                    fg=TEXTO, relief="solid", bd=1, highlightthickness=0,
-                   command=self._construir_grids).grid(row=1, column=3, sticky="w")
+                   command=self._reconstruir_entradas).grid(row=1, column=3, sticky="w")
 
         def aplicar():
             self._leer_dimension(var_m, 2)
             self._leer_dimension(var_n, 2)
-            self._construir_grids()
+            self._reconstruir_entradas()
 
         self.botones_mas[letra] = tk.Button(
             cont, text="✓", font=self.fuente_body, bg=ACENTO, fg=FONDO,
@@ -2381,6 +2487,91 @@ class MatricesOpsApp:
             activebackground=ACENTO_HOVER, activeforeground=FONDO, command=aplicar)
         self.botones_mas[letra].grid(row=0, column=4, sticky="e", padx=(8, 0), pady=(0, 8))
         return tarjeta
+
+    def _llenar_tarjeta_producto_vectorial(self, padre):
+        """Crea el formulario para Ax, aditividad y homogeneidad de Ax."""
+        tarjeta = self._crear_tarjeta(padre)
+        tarjeta.pack(fill="x", pady=(0, 10))
+        cont = tk.Frame(tarjeta, bg=TARJETA)
+        cont.pack(fill="x", padx=18, pady=(14, 8))
+
+        tk.Label(cont, text="Producto matriz-vector y propiedades",
+                 font=self.fuente_sub, bg=TARJETA, fg=TEXTO,
+                 anchor="w").pack(fill="x", pady=(0, 6))
+        tk.Label(cont, text="Usa la matriz A ingresada arriba. La longitud de cada vector debe coincidir con sus columnas.",
+                 font=self.fuente_body, bg=TARJETA, fg=TEXTO_SUAVE,
+                 justify="left", wraplength=420, anchor="w").pack(fill="x", pady=(0, 6))
+
+        tk.Label(cont, text="Operación", font=self.fuente_body,
+                 bg=TARJETA, fg=TEXTO_SUAVE).pack(anchor="w")
+        opciones = ("Calcular A·x",
+                    "Verificar A(u + v) = Au + Av",
+                    "Verificar A(cu) = c(Au)")
+        selector = tk.OptionMenu(cont, self.var_modo_ax, *opciones,
+                                 command=lambda _valor: self._construir_grid_vectores_ax())
+        selector.configure(font=self.fuente_body, bg="#FFFFFF", fg=TEXTO,
+                           activebackground=BOTON_SEC, relief="solid", bd=1,
+                           highlightthickness=0, anchor="w")
+        selector.pack(fill="x", pady=(2, 6))
+
+        self.frame_escalar_ax = tk.Frame(cont, bg=TARJETA)
+        tk.Label(self.frame_escalar_ax, text="Escalar c =", font=self.fuente_body,
+                 bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
+        tk.Entry(self.frame_escalar_ax, textvariable=self.var_escalar_ax,
+                 font=self.fuente_mono, width=7, justify="center",
+                 relief="solid", bd=1).pack(side="left", padx=6)
+
+        self.frame_vectores_ax = tk.Frame(cont, bg=TARJETA)
+        self.frame_vectores_ax.pack(fill="x", pady=(4, 2))
+
+        self.boton_calcular_ax = tk.Button(
+            cont, text="Calcular / verificar", font=self.fuente_boton,
+            bg=ACENTO, fg=FONDO, relief="flat", cursor="hand2",
+            padx=12, pady=8, activebackground=ACENTO_HOVER,
+            activeforeground=FONDO, command=self._al_producto_vectorial)
+        self.boton_calcular_ax.pack(fill="x", pady=(6, 0))
+
+    def _roles_vectores_ax(self):
+        """Devuelve los vectores que necesita la operación seleccionada."""
+        modo = self.var_modo_ax.get()
+        if modo == "Verificar A(u + v) = Au + Av":
+            return ("u", "v")
+        if modo == "Verificar A(cu) = c(Au)":
+            return ("u",)
+        return ("x",)
+
+    def _construir_grid_vectores_ax(self):
+        """Dibuja vectores columna de longitud igual al número de columnas de A."""
+        if not hasattr(self, "frame_vectores_ax"):
+            return
+        for nombre, celdas in self.celdas_vectores_ax.items():
+            cache = self.valores_vectores_ax.setdefault(nombre, {})
+            for i, celda in celdas.items():
+                cache[i] = celda.get()
+        for hijo in self.frame_vectores_ax.winfo_children():
+            hijo.destroy()
+        self.celdas_vectores_ax = {}
+
+        if self.var_modo_ax.get() == "Verificar A(cu) = c(Au)":
+            self.frame_escalar_ax.pack(fill="x", before=self.frame_vectores_ax,
+                                       pady=(2, 4))
+        else:
+            self.frame_escalar_ax.pack_forget()
+
+        n = self._leer_dimension(self.var_na, 2)
+        for columna, nombre in enumerate(self._roles_vectores_ax()):
+            marco = tk.Frame(self.frame_vectores_ax, bg=TARJETA)
+            marco.grid(row=0, column=columna, sticky="nw", padx=(0, 12))
+            tk.Label(marco, text="Vector " + nombre, font=self.fuente_encab,
+                     bg=TARJETA, fg=ACENTO).grid(row=0, column=0, sticky="w", pady=(0, 3))
+            self.celdas_vectores_ax[nombre] = {}
+            for i in range(n):
+                valor_previo = self.valores_vectores_ax.get(nombre, {}).get(i, "")
+                variable = tk.StringVar(value=valor_previo)
+                self.celdas_vectores_ax[nombre][i] = variable
+                tk.Entry(marco, textvariable=variable, font=self.fuente_mono,
+                         width=7, justify="center", relief="solid", bd=1,
+                         bg=CELDA_FONDO).grid(row=i + 1, column=0, pady=2)
 
     def _construir_grids(self):
         """Redibuja las cuadrículas de A y B conservando los valores previos."""
@@ -2517,11 +2708,156 @@ class MatricesOpsApp:
         except ValueError as e:
             self._mostrar_error(str(e))
 
+    def _leer_vector_ax(self, nombre):
+        """Lee un vector auxiliar e informa cuál componente tiene un error."""
+        n = self._leer_dimension(self.var_na, 2)
+        celdas = self.celdas_vectores_ax.get(nombre, {})
+        vector = []
+        for i in range(n):
+            try:
+                vector.append(a_numero(celdas[i].get()))
+            except (KeyError, ValueError):
+                raise ValueError("Revisa el vector " + nombre + ", componente "
+                                 + str(i + 1) + ". " + AYUDA_NUMERO)
+        return vector
+
+    def _al_producto_vectorial(self):
+        """Calcula Ax o comprueba una de las dos propiedades de linealidad."""
+        try:
+            self._reconstruir_entradas()
+            A = self._leer_matriz(self.celdas_A,
+                                  self._leer_dimension(self.var_ma, 2),
+                                  self._leer_dimension(self.var_na, 2), "A")
+            modo = self.var_modo_ax.get()
+
+            if modo == "Verificar A(u + v) = Au + Av":
+                u = self._leer_vector_ax("u")
+                v = self._leer_vector_ax("v")
+                r = verificar_aditividad_matriz_vector(A, u, v)
+                conclusion = ("Conclusión: se cumple A(u + v) = Au + Av; "
+                              "ambos lados son iguales." if r["se_cumple"] else
+                              "Conclusión: los lados no coinciden; revisa los datos.")
+                detalle = (
+                    "1. u + v = " + formato_vector(r["u_mas_v"]) + "\n"
+                    "2. A(u + v) = " + formato_vector(r["izquierda"]) + "\n"
+                    "3. Au = " + formato_vector(r["Au"]) + "\n"
+                    "   Av = " + formato_vector(r["Av"]) + "\n"
+                    "4. Au + Av = " + formato_vector(r["derecha"]) + "\n\n"
+                    + conclusion)
+                pasos = ["VERIFICACIÓN DE ADITIVIDAD: A(u + v) = Au + Av", "",
+                         "Matriz A:", *formato_matriz(A),
+                         "u = " + formato_vector(u),
+                         "v = " + formato_vector(v), "",
+                         "1. Suma de los vectores: u + v = "
+                         + formato_vector(r["u_mas_v"]), "",
+                         *pasos_matriz_por_vector(A, r["u_mas_v"]), "",
+                         *pasos_matriz_por_vector(A, u), "",
+                         *pasos_matriz_por_vector(A, v), "",
+                         "Suma de resultados: Au + Av = "
+                         + formato_vector(r["Au"]) + " + "
+                         + formato_vector(r["Av"]) + " = "
+                         + formato_vector(r["derecha"]), "", conclusion]
+                self._mostrar_vector_resultado("Verificación de aditividad",
+                                               r["izquierda"], detalle, pasos)
+                return
+
+            if modo == "Verificar A(cu) = c(Au)":
+                u = self._leer_vector_ax("u")
+                c = a_numero(self.var_escalar_ax.get())
+                r = verificar_homogeneidad_matriz_vector(A, c, u)
+                conclusion = ("Conclusión: se cumple A(cu) = c(Au); "
+                              "ambos lados son iguales." if r["se_cumple"] else
+                              "Conclusión: los lados no coinciden; revisa los datos.")
+                detalle = (
+                    "Escalar: c = " + formato(c) + "\n"
+                    "1. cu = " + formato(c) + "·" + formato_vector(u)
+                    + " = " + formato_vector(r["cu"]) + "\n"
+                    "2. A(cu) = " + formato_vector(r["izquierda"]) + "\n"
+                    "3. Au = " + formato_vector(r["Au"]) + "\n"
+                    "4. c(Au) = " + formato(c) + "·"
+                    + formato_vector(r["Au"]) + " = "
+                    + formato_vector(r["derecha"]) + "\n\n" + conclusion)
+                pasos = ["VERIFICACIÓN DE HOMOGENEIDAD: A(cu) = c(Au)", "",
+                         "Matriz A:", *formato_matriz(A),
+                         "u = " + formato_vector(u), "c = " + formato(c), "",
+                         "1. Multiplicar u por c: cu = "
+                         + formato_vector(r["cu"]), "",
+                         *pasos_matriz_por_vector(A, r["cu"]), "",
+                         *pasos_matriz_por_vector(A, u), "",
+                         "Multiplicar Au por c: c(Au) = " + formato(c) + "·"
+                         + formato_vector(r["Au"]) + " = "
++ formato_vector(r["derecha"]), "", conclusion]
+                self._mostrar_vector_resultado("Verificación de homogeneidad",
+                                               r["izquierda"], detalle, pasos)
+                return
+
+            x = self._leer_vector_ax("x")
+            resultado = matriz_por_vector(A, x)
+            columnas = [[fila[j] for fila in A] for j in range(len(A[0]))]
+            combinacion = _formato_suma_lineal(x, "a")
+            detalle = ("Cada componente es el producto de una fila de A por x.\n"
+                       "Como x = " + formato_vector(x) + ", también es la combinación "
+                       "lineal de las columnas de A:\nAx = " + combinacion + " = "
+                       + formato_vector(resultado))
+            pasos = ["PRODUCTO MATRIZ-VECTOR Ax", "", "Matriz A:",
+                     *formato_matriz(A), "x = " + formato_vector(x), "",
+                     *pasos_matriz_por_vector(A, x), "",
+                     "COLUMNAS DE A Y COMBINACIÓN LINEAL EXPLÍCITA:",
+                     *_expansion_por_columnas(x, columnas, "a", resultado),
+                     "Ax = " + combinacion + " = " + formato_vector(resultado)]
+            self._mostrar_vector_resultado("Producto A·x", resultado,
+                                           detalle, pasos)
+        except ValueError as e:
+            self._mostrar_error(str(e))
+
+    def _mostrar_vector_resultado(self, titulo, vector, detalle, pasos):
+        """Presenta el resultado vectorial y mantiene el botón de desarrollo."""
+        for hijo in self.frame_resultado.winfo_children():
+            hijo.destroy()
+        if self.aviso_vacio is not None:
+            self.aviso_vacio.destroy()
+            self.aviso_vacio = None
+            self.lienzo_resultado.pack(side="left", fill="both", expand=True,
+                                       padx=(6, 0), pady=(0, 12))
+            self.barra_resultado.pack(side="right", fill="y", pady=(0, 12))
+        self.etiquetas_ajustables = []
+        self.procedimiento_visible = False
+        self.sub_procedimiento = None
+
+        sub = self._sub_tarjeta("RESULTADO", EXITO)
+        cartel = tk.Frame(sub, bg=EXITO, padx=14, pady=10)
+        cartel.pack(fill="x", pady=(0, 6))
+        self._texto_ajustable(tk.Label(cartel, text=titulo, font=self.fuente_big,
+                                       bg=EXITO, fg=FONDO)).pack(fill="x")
+        self._texto_ajustable(tk.Label(sub, text="Vector calculado / lado izquierdo: "
+                                       + formato_vector(vector),
+                                       font=self.fuente_mono, bg=TARJETA,
+                                       fg=TEXTO)).pack(fill="x", pady=(0, 6))
+        self._texto_ajustable(tk.Label(sub, text=detalle, font=self.fuente_mono,
+                                       bg=TARJETA, fg=TEXTO_SUAVE,
+                                       justify="left", anchor="w",
+                                       wraplength=480)).pack(fill="x", pady=(0, 8))
+
+        self.ultimo_resultado = {
+            "titulo": titulo,
+            "vector": vector,
+            "pasos": pasos,
+            "procedimiento_titulo": "DESARROLLO PASO A PASO",
+        }
+        self.boton_procedimiento.configure(text="Ver procedimiento")
+        if pasos:
+            self.boton_procedimiento.pack(side="right")
+        else:
+            self.boton_procedimiento.pack_forget()
+        self.lienzo_resultado.yview_moveto(0)
+        self.raiz.update_idletasks()
+        self._ajustar_textos()
+
     # ---------- panel de resultados ----------
     def _ajustar_textos(self, ancho_disponible=None):
         if ancho_disponible is None:
             ancho_disponible = self.lienzo_resultado.winfo_width()
-        ancho = max(240, ancho_disponible - 56)
+        ancho = max(120, ancho_disponible - 56)
         for etiqueta in self.etiquetas_ajustables:
             try:
                 etiqueta.configure(wraplength=ancho)
@@ -2571,7 +2907,8 @@ class MatricesOpsApp:
                                            anchor="w", wraplength=480)).pack(fill="x",
                                                                              pady=(0, 8))
 
-        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos}
+        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos,
+                                 "procedimiento_titulo": "PROCEDIMIENTO DEL PRODUCTO A·B"}
         self.boton_procedimiento.configure(text="Ver procedimiento")
         if pasos:
             self.boton_procedimiento.pack(side="right")
@@ -2590,19 +2927,27 @@ class MatricesOpsApp:
             self.boton_procedimiento.configure(text="Ver procedimiento")
             self.procedimiento_visible = False
         else:
-            self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA)
-            tk.Label(self.sub_procedimiento, text="PROCEDIMIENTO DEL PRODUCTO A·B",
-                     font=self.fuente_encab, bg=TARJETA, fg=TEXTO_SUAVE,
-                     anchor="w").pack(fill="x", padx=2, pady=(6, 2))
-            self._texto_ajustable(tk.Label(self.sub_procedimiento,
-                                           text=self.ultimo_resultado["pasos"],
-                                           font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
-                                           justify="left", anchor="w")).pack(fill="x",
-                                                                             pady=(0, 10))
-            self.sub_procedimiento.pack(fill="x", padx=16, pady=(4, 2), anchor="n")
+            if self.sub_procedimiento is None:
+                self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA,
+                                                  highlightbackground=BOTON_SEC,
+                                                  highlightthickness=1, bd=0)
+                tk.Label(self.sub_procedimiento,
+                         text=self.ultimo_resultado.get(
+                             "procedimiento_titulo", "DESARROLLO PASO A PASO"),
+                         font=self.fuente_encab, bg=TARJETA, fg=TEXTO,
+                         anchor="w").pack(fill="x", padx=14, pady=(10, 6))
+                pasos = self.ultimo_resultado["pasos"]
+                texto_proc = pasos if isinstance(pasos, str) else "\n".join(pasos)
+                self._texto_ajustable(
+                    tk.Label(self.sub_procedimiento, text=texto_proc,
+                             font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
+                             justify="left", anchor="nw"
+                             )).pack(fill="x", padx=14, pady=(0, 10))
+            self.sub_procedimiento.pack(fill="x", padx=16, pady=(8, 2), anchor="n")
             self.boton_procedimiento.configure(text="Ocultar procedimiento")
             self.procedimiento_visible = True
         self.raiz.update_idletasks()
+        self._ajustar_textos()
         self.lienzo_resultado.configure(scrollregion=self.lienzo_resultado.bbox("all"))
 
     def _mostrar_error(self, mensaje):
@@ -2752,6 +3097,59 @@ def ejecutar_pruebas():
         probar("A·x dimensiones incompatibles", False, "No lanzó ValueError")
     except ValueError:
         probar("A·x dimensiones incompatibles", True)
+
+# Verificación de la propiedad distributiva A(u+v)=Au+Av.
+    A_prop = [[fr("1/2"), fr("1/3")],
+              [fr("-1/3"), fr("1/2")]]
+    u_prop = [fr(1), fr(0)]
+    v_prop = [fr(0), fr(1)]
+    aditividad = verificar_aditividad_matriz_vector(A_prop, u_prop, v_prop)
+    probar("Aditividad: A(u+v)=Au+Av",
+           aditividad["se_cumple"]
+           and aditividad["izquierda"] == [fr("5/6"), fr("1/6")]
+           and aditividad["derecha"] == aditividad["izquierda"])
+
+    # Verificación de homogeneidad con un escalar distinto de 0 y 1.
+    homogeneidad = verificar_homogeneidad_matriz_vector(
+        A_prop, fr(-2), u_prop)
+    probar("Homogeneidad: A(cu)=c(Au)",
+           homogeneidad["se_cumple"]
+           and homogeneidad["izquierda"] == [fr(-1), fr("2/3")]
+           and homogeneidad["derecha"] == homogeneidad["izquierda"])
+
+    # Producto matriz-vector 3×3 con fracciones y vista por columnas.
+    A_rect = [[fr("1/2"), fr(0), fr("1/3")],
+              [fr(0), fr("1/2"), fr("1/3")],
+              [fr("1/3"), fr("1/3"), fr(0)]]
+    x_vector = [fr(1), fr(1), fr(1)]
+    Ax_vector = matriz_por_vector(A_rect, x_vector)
+    probar("Producto A·x con fracciones y combinación de columnas",
+           Ax_vector == [fr("5/6"), fr("5/6"), fr("2/3")]
+           and _formato_suma_lineal(x_vector, "a")
+           == "a₁ + a₂ + a₃")
+
+    # Expansión explícita por columnas (escalares y sumandos vectoriales).
+    columnas_rect = [[fila[j] for fila in A_rect] for j in range(3)]
+    lineas_exp = _expansion_por_columnas(x_vector, columnas_rect, "a", Ax_vector)
+    probar("Expansión explícita por columnas",
+           lineas_exp[0] == "a₁ = ( 1/2,  0,  1/3 )"
+           and lineas_exp[2] == "a₃ = ( 1/3,  1/3,  0 )"
+           and lineas_exp[3] == "1·a₁ + 1·a₂ + 1·a₃ = ( 1/2,  0,  1/3 )"
+           " + ( 0,  1/2,  1/3 ) + ( 1/3,  1/3,  0 ) = ( 5/6,  5/6,  2/3 )",
+           f"lineas={lineas_exp}")
+
+    # Las fracciones se comparan exactamente; float tiene resguardo de tolerancia.
+    probar("Comparación exacta de fracciones",
+           vectores_iguales([fr("1/3") + fr("2/3")], [fr(1)]))
+    probar("Tolerancia para float externo",
+           vectores_iguales([0.1 + 0.2], [0.3]))
+
+    try:
+        verificar_aditividad_matriz_vector([[fr(1), fr(2)]], [fr(1)], [fr(1)])
+        probar("Validación de dimensiones en propiedad", False,
+               "No lanzó ValueError")
+    except ValueError:
+        probar("Validación de dimensiones en propiedad", True)
 
     # Suma / resta / escalar de vectores
     u = [fr(1), fr(2), fr(3)]
