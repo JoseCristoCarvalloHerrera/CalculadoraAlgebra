@@ -1,0 +1,24 @@
+# ---------------------------------------------------------------
+# Archivos que NO forman parte del proyecto y no deben subirse.
+# Los genera Python o el sistema operativo automáticamente.
+# ---------------------------------------------------------------
+
+# Código compilado que Python crea al ejecutar un .py
+__pycache__/
+*.pyc
+*.pyo
+
+# Entornos virtuales de Python
+.venv/
+venv/
+env/
+
+# Archivos que genera Windows / OneDrive
+Thumbs.db
+desktop.ini
+*.lnk
+
+# Archivos temporales de editores
+*.swp
+*~
+.vscode/settings.json
