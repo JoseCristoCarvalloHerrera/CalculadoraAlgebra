@@ -934,7 +934,7 @@ def analizar_independencia(vectores):
     pasos.append("   " + " + ".join(
         "c" + str(j + 1) + "·v" + str(j + 1) for j in range(k)) + " = 0")
     pasos.append("")
-    pasos.append("Matriz aumentada [v₁ v₂ … v_k | 0] "
+    pasos.append("Matriz aumentada [v₁ v₂ … vₖ | 0] "
                  "(cada vector es una COLUMNA):")
     pasos.extend(formato_matriz(aumentada, k))
     pasos.append("")
@@ -963,8 +963,8 @@ def analizar_independencia(vectores):
         razon = ("El número de pivotes (" + str(cantidad_pivotes)
                  + ") es igual al número de vectores (" + str(k)
                  + "), así que no hay variables libres. La única solución de "
-                 "c₁v₁ + … + c_kv_k = 0 es la trivial "
-                 "c₁ = c₂ = … = c_k = 0.")
+                 "c₁v₁ + … + cₖvₖ = 0 es la trivial "
+                 "c₁ = c₂ = … = cₖ = 0.")
         relaciones = []
     else:
         veredicto = "LINEALMENTE DEPENDIENTES (L.D.)"
@@ -972,7 +972,7 @@ def analizar_independencia(vectores):
                  + ") es menor que el número de vectores (" + str(k)
                  + "), así que quedan " + str(cantidad_libres)
                  + " variable(s) libre(s). Existe una solución NO trivial de "
-                 "c₁v₁ + … + c_kv_k = 0, con coeficientes no todos cero.")
+                 "c₁v₁ + … + cₖvₖ = 0, con coeficientes no todos cero.")
         relaciones = relacion_de_dependencia(vectores)
 
     return {
@@ -1000,7 +1000,7 @@ def informe_independencia(vectores):
     lineas = []
     lineas.append("Conjunto de " + str(r["k"]) + " vectores en R^" + str(r["n"]))
     lineas.append("")
-    lineas.append("--- MATRIZ REDUCIDA [v₁ … v_k | 0] ---")
+    lineas.append("--- MATRIZ REDUCIDA [v₁ … vₖ | 0] ---")
     lineas.extend(formato_matriz(r["matriz_reducida"], r["k"]))
     lineas.append("")
     lineas.append("--- CONTEO ---")

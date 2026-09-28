@@ -25,3 +25,6 @@ desktop.ini
 
 # Material de estudio, no forma parte del entregable
 guias_defensa/
+
+# Paquete de entrega, se regenera cuando haga falta
+*.zip
