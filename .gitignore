@@ -22,3 +22,6 @@ desktop.ini
 *.swp
 *~
 .vscode/settings.json
+
+# Material de estudio, no forma parte del entregable
+guias_defensa/
