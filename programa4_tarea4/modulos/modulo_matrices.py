@@ -108,6 +108,87 @@ def escalar_por_matriz(c, A):
     return resultado
 
 
+def transponer_matriz(A):
+    """Devuelve la transpuesta de A: si A es m×n, el resultado es n×m.
+
+    Método algebraico equivalente: la entrada (i, j) del resultado es la
+    entrada (j, i) de la original,
+        (Aᵀ)[i][j] = A[j][i].
+    Dicho de otro modo, las COLUMNAS de A pasan a ser las FILAS de Aᵀ.
+    No hay condición de tamaño: toda matriz tiene transpuesta."""
+    _validar_matriz(A, "A")
+    m, n = _leer_dimensiones(A)
+    resultado = []
+    for j in range(n):            # recorre las COLUMNAS de A
+        fila = []
+        for i in range(m):        # baja por esa columna
+            fila.append(A[i][j])
+        resultado.append(fila)    # la columna completa se guarda como fila
+    return resultado
+
+
+PROPIEDADES_TRANSPUESTA = (
+    "(Aᵀ)ᵀ = A",
+    "(A + B)ᵀ = Aᵀ + Bᵀ",
+    "(rA)ᵀ = r·Aᵀ",
+    "(AB)ᵀ = Bᵀ·Aᵀ",
+)
+
+
+def verificar_propiedad_transpuesta(propiedad, A, B=None, r=None):
+    """Comprueba numéricamente una de las cuatro propiedades de la transpuesta.
+
+    No demuestra la propiedad: calcula el lado IZQUIERDO y el lado DERECHO
+    por separado, con los datos que dé el usuario, y los compara. Devuelve
+    un diccionario con los dos lados, los pasos intermedios y si coinciden.
+    """
+    _validar_matriz(A, "A")
+
+    if propiedad == "(Aᵀ)ᵀ = A":
+        At = transponer_matriz(A)
+        izquierda = transponer_matriz(At)
+        derecha = [fila[:] for fila in A]
+        intermedios = [("Aᵀ", At)]
+
+    elif propiedad == "(A + B)ᵀ = Aᵀ + Bᵀ":
+        _validar_matriz(B, "B")
+        validar_operables_suma(A, B)
+        suma = sumar_matrices(A, B)
+        izquierda = transponer_matriz(suma)
+        At, Bt = transponer_matriz(A), transponer_matriz(B)
+        derecha = sumar_matrices(At, Bt)
+        intermedios = [("A + B", suma), ("Aᵀ", At), ("Bᵀ", Bt)]
+
+    elif propiedad == "(rA)ᵀ = r·Aᵀ":
+        if r is None:
+            raise ValueError("Falta el escalar r para esta propiedad.")
+        rA = escalar_por_matriz(r, A)
+        izquierda = transponer_matriz(rA)
+        At = transponer_matriz(A)
+        derecha = escalar_por_matriz(r, At)
+        intermedios = [("r·A", rA), ("Aᵀ", At)]
+
+    elif propiedad == "(AB)ᵀ = Bᵀ·Aᵀ":
+        _validar_matriz(B, "B")
+        validar_multiplicables(A, B)
+        AB = multiplicar_matrices(A, B)
+        izquierda = transponer_matriz(AB)
+        At, Bt = transponer_matriz(A), transponer_matriz(B)
+        derecha = multiplicar_matrices(Bt, At)
+        intermedios = [("A·B", AB), ("Aᵀ", At), ("Bᵀ", Bt)]
+
+    else:
+        raise ValueError("Propiedad no reconocida: " + str(propiedad))
+
+    return {
+        "propiedad": propiedad,
+        "izquierda": izquierda,
+        "derecha": derecha,
+        "intermedios": intermedios,
+        "se_cumple": izquierda == derecha,
+    }
+
+
 def validar_multiplicables(A, B):
     """Exige que el número de columnas de A sea igual al de filas de B."""
     _, nA = _leer_dimensiones(A)
@@ -219,6 +300,8 @@ class MatricesOpsApp:
         self.var_nb = tk.StringVar(value="2")   # columnas de B
         self.var_escalar = tk.StringVar(value="2")
         self.var_modo_ax = tk.StringVar(value="Calcular A·x")
+        self.var_prop_t = tk.StringVar(value=PROPIEDADES_TRANSPUESTA[0])
+        self.var_escalar_t = tk.StringVar(value="2")
         self.var_escalar_ax = tk.StringVar(value="2")
         self.celdas_A = {}
         self.celdas_B = {}
@@ -316,6 +399,7 @@ class MatricesOpsApp:
 
         self._llenar_botones(self.frame_izq)
         self._llenar_tarjeta_producto_vectorial(self.frame_izq)
+        self._llenar_tarjeta_transpuesta(self.frame_izq)
 
         # ---- panel derecho (resultados) ----
         panel_der = tk.Frame(self.marco_principal, bg=FONDO)
@@ -474,6 +558,42 @@ class MatricesOpsApp:
             activeforeground=FONDO, command=self._al_producto_vectorial)
         self.boton_calcular_ax.pack(fill="x", pady=(6, 0))
 
+    def _llenar_tarjeta_transpuesta(self, padre):
+        """Tarjeta para comprobar las cuatro propiedades de la transpuesta.
+        Usa las matrices A y B ya ingresadas arriba."""
+        tarjeta = self._crear_tarjeta(padre)
+        tarjeta.pack(fill="x", pady=(0, 10))
+        cont = tk.Frame(tarjeta, bg=TARJETA)
+        cont.pack(fill="x", padx=18, pady=(14, 12))
+
+        tk.Label(cont, text="Propiedades de la transpuesta",
+                 font=self.fuente_sub, bg=TARJETA, fg=TEXTO,
+                 anchor="w").pack(fill="x", pady=(0, 6))
+        tk.Label(cont, text="Usa las matrices A y B ingresadas arriba. Se calcula cada lado por separado y se comparan.",
+                 font=self.fuente_body, bg=TARJETA, fg=TEXTO_SUAVE,
+                 justify="left", wraplength=420, anchor="w").pack(fill="x", pady=(0, 6))
+
+        selector = tk.OptionMenu(cont, self.var_prop_t, *PROPIEDADES_TRANSPUESTA)
+        selector.configure(font=self.fuente_body, bg="#FFFFFF", fg=TEXTO,
+                           activebackground=BOTON_SEC, relief="solid", bd=1,
+                           highlightthickness=0, anchor="w")
+        selector.pack(fill="x", pady=(2, 6))
+
+        fila_r = tk.Frame(cont, bg=TARJETA)
+        fila_r.pack(fill="x", pady=(0, 6))
+        tk.Label(fila_r, text="Escalar r =", font=self.fuente_body,
+                 bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
+        tk.Entry(fila_r, textvariable=self.var_escalar_t, font=self.fuente_mono,
+                 width=7, justify="center", relief="solid", bd=1).pack(side="left", padx=6)
+        tk.Label(fila_r, text="(solo para (rA)ᵀ = r·Aᵀ)", font=self.fuente_body,
+                 bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
+
+        tk.Button(cont, text="Verificar propiedad", font=self.fuente_boton,
+                  bg=ACENTO, fg=FONDO, relief="flat", cursor="hand2",
+                  padx=12, pady=8, activebackground=ACENTO_HOVER,
+                  activeforeground=FONDO,
+                  command=self._al_verificar_transpuesta).pack(fill="x")
+
     def _roles_vectores_ax(self):
         """Devuelve los vectores que necesita la operación seleccionada."""
         modo = self.var_modo_ax.get()
@@ -564,6 +684,8 @@ class MatricesOpsApp:
             ("Restar", self._al_restar),
             ("Multiplicar por escalar", self._al_escalar),
             ("Multiplicar matrices", self._al_producto),
+            ("Transpuesta de A", self._al_transponer_a),
+            ("Transpuesta de B", self._al_transponer_b),
             ("Limpiar", self._limpiar_matrices),
         ]
         for i, (texto, accion) in enumerate(acciones):
@@ -648,6 +770,68 @@ class MatricesOpsApp:
             self._mostrar_matriz("A · B", C,
                                  "C[i][j] = Σₖ A[i][k]·B[k][j]  (regla fila-columna).",
                                  pasos=pasos_multiplicar_matrices(A, B))
+        except ValueError as e:
+            self._mostrar_error(str(e))
+
+    def _al_transponer_a(self):
+        """Botón «Transpuesta de A»."""
+        self._transponer(self.celdas_A, self.var_ma, self.var_na, "A")
+
+    def _al_transponer_b(self):
+        """Botón «Transpuesta de B»."""
+        self._transponer(self.celdas_B, self.var_mb, self.var_nb, "B")
+
+    def _al_verificar_transpuesta(self):
+        """Comprueba la propiedad elegida con las matrices A y B de la pantalla."""
+        try:
+            self._construir_grids()
+            propiedad = self.var_prop_t.get()
+            A = self._leer_matriz(self.celdas_A, self._leer_dimension(self.var_ma, 2),
+                                  self._leer_dimension(self.var_na, 2), "A")
+            B = None
+            r = None
+            if propiedad in ("(A + B)ᵀ = Aᵀ + Bᵀ", "(AB)ᵀ = Bᵀ·Aᵀ"):
+                B = self._leer_matriz(self.celdas_B,
+                                      self._leer_dimension(self.var_mb, 2),
+                                      self._leer_dimension(self.var_nb, 2), "B")
+            if propiedad == "(rA)ᵀ = r·Aᵀ":
+                r = a_numero(self.var_escalar_t.get())
+
+            res = verificar_propiedad_transpuesta(propiedad, A, B, r)
+
+            conclusion = ("Conclusión: los dos lados coinciden, se cumple "
+                          + propiedad + "."
+                          if res["se_cumple"] else
+                          "Conclusión: los lados no coinciden; revisa los datos.")
+            pasos = ["VERIFICACIÓN DE: " + propiedad, "", "Matriz A:",
+                     *formato_matriz(A)]
+            if B is not None:
+                pasos += ["", "Matriz B:", *formato_matriz(B)]
+            if r is not None:
+                pasos += ["", "Escalar r = " + formato(r)]
+            for titulo, M in res["intermedios"]:
+                pasos += ["", titulo + ":", *formato_matriz(M)]
+            pasos += ["", "LADO IZQUIERDO:", *formato_matriz(res["izquierda"]),
+                      "", "LADO DERECHO:", *formato_matriz(res["derecha"]),
+                      "", conclusion]
+
+            self._mostrar_matriz("Lado izquierdo de " + propiedad,
+                                 res["izquierda"], conclusion, pasos=pasos)
+        except ValueError as e:
+            self._mostrar_error(str(e))
+
+    def _transponer(self, celdas, var_filas, var_columnas, nombre):
+        """Transpone la matriz indicada y muestra el resultado.
+        Se usa para A y para B: solo cambian las celdas que se leen."""
+        try:
+            self._construir_grids()
+            M = self._leer_matriz(celdas, self._leer_dimension(var_filas, 2),
+                                  self._leer_dimension(var_columnas, 2), nombre)
+            T = transponer_matriz(M)
+            self._mostrar_matriz(
+                nombre + "ᵀ", T,
+                "(" + nombre + "ᵀ)[i][j] = " + nombre + "[j][i]  "
+                "(las columnas de " + nombre + " pasan a ser filas).")
         except ValueError as e:
             self._mostrar_error(str(e))
 
@@ -925,6 +1109,7 @@ def menu_consola():
         print("   5. Producto matriz-vector (A · x)")
         print("   6. Verificar A(u + v) = Au + Av")
         print("   7. Verificar A(cu) = c(Au)")
+        print("   8. Transpuesta (Aᵀ) y sus propiedades")
         print("   9. Volver al menú principal")
         print()
         opcion = preguntar("   Elegí una opción: ").strip()
@@ -943,6 +1128,8 @@ def menu_consola():
             _consola_ax()
         elif opcion in ("6", "7"):
             _consola_propiedad(opcion == "6")
+        elif opcion == "8":
+            _menu_transpuesta()
         else:
             print("   Opción no válida.")
             pausa()
@@ -974,6 +1161,91 @@ def _consola_operacion_basica(opcion):
             resultado = sumar_matrices(A, B) if opcion == "1" else restar_matrices(A, B)
         print()
         mostrar_matriz(resultado, titulo="   RESULTADO:")
+    except ValueError as error:
+        print("\n   " + str(error))
+    pausa()
+
+
+def _menu_transpuesta():
+    """Submenú de la opción 8: calcular la transpuesta o verificar sus
+    cuatro propiedades."""
+    while True:
+        mostrar_cabecera(LOGO_MATRICES)
+        print("   TRANSPUESTA Y SUS PROPIEDADES")
+        print()
+        print("   1. Calcular la transpuesta de una matriz")
+        print()
+        print("   Verificar una propiedad:")
+        for i, prop in enumerate(PROPIEDADES_TRANSPUESTA, start=2):
+            print("   " + str(i) + ". " + prop)
+        print()
+        print("   9. Volver")
+        print()
+        opcion = preguntar("   Elegí una opción: ").strip()
+
+        if opcion == "9":
+            return
+        elif opcion == "1":
+            _consola_transpuesta()
+        elif opcion in ("2", "3", "4", "5"):
+            _consola_propiedad_transpuesta(
+                PROPIEDADES_TRANSPUESTA[int(opcion) - 2])
+        else:
+            print("   Opción no válida.")
+            pausa()
+
+
+def _consola_propiedad_transpuesta(propiedad):
+    """Pide los datos que la propiedad necesita, calcula los dos lados
+    por separado y los compara."""
+    mostrar_cabecera(LOGO_MATRICES)
+    print("   VERIFICAR:  " + propiedad)
+    print()
+    try:
+        A = _pedir_matriz("A")
+        B = None
+        r = None
+        if propiedad in ("(A + B)ᵀ = Aᵀ + Bᵀ", "(AB)ᵀ = Bᵀ·Aᵀ"):
+            print()
+            B = _pedir_matriz("B")
+        if propiedad == "(rA)ᵀ = r·Aᵀ":
+            r = leer_numero("   Escalar r = ")
+
+        resultado = verificar_propiedad_transpuesta(propiedad, A, B, r)
+
+        print()
+        for titulo, M in resultado["intermedios"]:
+            mostrar_matriz(M, titulo="   " + titulo + ":")
+            print()
+        mostrar_matriz(resultado["izquierda"], titulo="   LADO IZQUIERDO:")
+        print()
+        mostrar_matriz(resultado["derecha"], titulo="   LADO DERECHO:")
+        print()
+        if resultado["se_cumple"]:
+            print("   Los dos lados coinciden: se cumple  " + propiedad)
+        else:
+            print("   Los lados NO coinciden. Revisá los datos ingresados.")
+    except ValueError as error:
+        print("\n   " + str(error))
+    pausa()
+
+
+def _consola_transpuesta():
+    """Opción 8: transpuesta de una matriz."""
+    mostrar_cabecera(LOGO_MATRICES)
+    print("   TRANSPUESTA DE UNA MATRIZ")
+    print()
+    try:
+        A = _pedir_matriz("A")
+        resultado = transponer_matriz(A)
+        m, n = _leer_dimensiones(A)
+        print()
+        mostrar_matriz(A, titulo="   MATRIZ ORIGINAL A (" + str(m) + "x" + str(n) + "):")
+        print()
+        mostrar_matriz(resultado, titulo="   TRANSPUESTA Aᵀ (" + str(n) + "x" + str(m) + "):")
+        print()
+        print("   Regla: (Aᵀ)[i][j] = A[j][i]. Las columnas de A pasan a ser")
+        print("   las filas de Aᵀ, por eso el tamaño se invierte.")
     except ValueError as error:
         print("\n   " + str(error))
     pausa()

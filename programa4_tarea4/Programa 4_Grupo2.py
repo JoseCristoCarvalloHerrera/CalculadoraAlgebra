@@ -69,7 +69,7 @@ from modulos.modulo_vectores import (
 )
 from modulos.modulo_matrices import (
     MatricesOpsApp, sumar_matrices, restar_matrices, escalar_por_matriz,
-    multiplicar_matrices, resolver_ecuacion_matricial,
+    multiplicar_matrices, resolver_ecuacion_matricial, transponer_matriz,
 )
 from modulos.modulo_determinantes import determinante, es_invertible
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
@@ -155,7 +155,6 @@ class MenuPrincipal:
         x = max(0, (self.raiz.winfo_screenwidth() - ancho) // 2)
         y = max(0, (self.raiz.winfo_screenheight() - alto) // 2)
         self.raiz.geometry(f"+{x}+{y}")
-
 
 
 
@@ -442,6 +441,28 @@ def ejecutar_pruebas():
         probar("Ecuación dimensiones distintas", False, "No lanzó ValueError")
     except ValueError:
         probar("Ecuación dimensiones distintas", True)
+
+    # --- Transpuesta de una matriz ---
+    A_t = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
+    T = transponer_matriz(A_t)
+    probar("Transpuesta 2x3 -> 3x2",
+           T == [[fr(1), fr(4)], [fr(2), fr(5)], [fr(3), fr(6)]], f"obtuvo {T}")
+    probar("(A^T)^T = A",
+           transponer_matriz(T) == A_t)
+    B_t = [[fr(0), fr(1), fr(1)], [fr(2), fr(0), fr(3)]]
+    probar("(A + B)^T = A^T + B^T",
+           transponer_matriz(sumar_matrices(A_t, B_t))
+           == sumar_matrices(transponer_matriz(A_t), transponer_matriz(B_t)))
+    probar("(rA)^T = r·A^T",
+           transponer_matriz(escalar_por_matriz(fr(3), A_t))
+           == escalar_por_matriz(fr(3), transponer_matriz(A_t)))
+    C_t = [[fr(1), fr(0)], [fr(2), fr(-1)], [fr(0), fr(4)]]
+    probar("(AB)^T = B^T·A^T  (orden invertido)",
+           transponer_matriz(multiplicar_matrices(A_t, C_t))
+           == multiplicar_matrices(transponer_matriz(C_t), transponer_matriz(A_t)))
+    probar("det(A^T) = det(A)",
+           determinante([[fr(3), fr(8)], [fr(4), fr(6)]])
+           == determinante(transponer_matriz([[fr(3), fr(8)], [fr(4), fr(6)]])))
 
 
 
