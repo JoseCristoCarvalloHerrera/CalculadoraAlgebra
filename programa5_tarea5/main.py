@@ -117,8 +117,12 @@ class MenuPrincipal:
         MatricesOpsApp(self.raiz, callback_volver=self.mostrar_menu)
 
     def abrir_determinantes(self):
-        """El Módulo 4 se entrega con su motor de cálculo y su resumen de
-        teoremas; la pantalla completa se construye en el Programa 5."""
+        """Abre el resumen de teoremas del Módulo 4.
+        El motor de cálculo del módulo vive en modulos/modulo_determinantes.py
+        (cofactores, Sarrus y reducción a triangular). No tiene pantalla propia
+        porque opera sobre la misma matriz A que el resto de operaciones: sus
+        botones están en Operaciones Matriciales para no pedir la matriz dos
+        veces."""
         mostrar_teoremas(self.raiz, "determinantes",
                          "Módulo 4: Determinantes y Propiedades")
 

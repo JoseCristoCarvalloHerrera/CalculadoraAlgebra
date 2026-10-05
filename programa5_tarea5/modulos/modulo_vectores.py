@@ -536,7 +536,7 @@ class VectoresApp:
             ("v₁ − v₂", self._al_restar),
             ("x · v₁", self._al_escalar),
             ("Resolver x₁v₁ + … + xₖvₖ = y", self._al_combinacion),
-            ("¿L.I. o L.D.?  (Programa 4)", self._al_independencia),
+            ("¿L.I. o L.D.?", self._al_independencia),
             ("Limpiar", self._limpiar_vectores),
         ]
         for i, (texto, accion) in enumerate(acciones):

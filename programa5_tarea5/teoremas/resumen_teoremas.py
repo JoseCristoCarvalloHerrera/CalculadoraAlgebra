@@ -74,7 +74,7 @@ TEOREMAS = {
    En particular, b se puede generar como combinacion lineal de
    a1...an SI Y SOLO SI ese sistema lineal tiene solucion.
 
-3. TEOREMA DE INDEPENDENCIA LINEAL   <-- REQUISITO DEL PROGRAMA 4
+3. TEOREMA DE INDEPENDENCIA LINEAL
    Un conjunto de k vectores en R^n es LINEALMENTE INDEPENDIENTE si y
    solo si la UNICA solucion de
         c1·v1 + c2·v2 + ... + ck·vk = 0
@@ -220,7 +220,8 @@ TEOREMAS = {
 
    Si det(A) = 0, la matriz es SINGULAR (no tiene inversa).
 
-   NOTA: la matriz inversa se implementa en el siguiente programa.""",
+   NOTA: la inversa se calcula en el modulo de Operaciones Matriciales,
+   por Gauss-Jordan y por matriz adjunta.""",
 }
 
 
