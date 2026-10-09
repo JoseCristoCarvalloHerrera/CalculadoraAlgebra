@@ -39,8 +39,7 @@ from modulos import (
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_numero,
     leer_vector, leer_matriz, mostrar_matriz, pausa, preguntar,
 )
-from teoremas.resumen_teoremas import (mostrar_teoremas, mostrar_texto,
-                                      texto_teoremas)
+from teoremas.resumen_teoremas import mostrar_teoremas, texto_teoremas
 from modulos.modulo_determinantes import pasos_cramer, regla_de_cramer
 
 
@@ -978,24 +977,91 @@ class CalculadoraApp:
 
 
     def _al_cramer(self):
-        """Resuelve el sistema de la pantalla con la regla de Cramer y
-        muestra el desarrollo completo en una ventana aparte."""
+        """Resuelve el sistema de la pantalla con la regla de Cramer.
+        El resultado se pinta en el mismo panel que usa «Resolver
+        Sistema», para que las dos vías se vean igual."""
         A, b = self._leer_sistema()
         if A is None:
             return
         try:
-            soluciones, _, _ = regla_de_cramer(A, b)
-            lineas = ["REGLA DE CRAMER", "", "Matriz A:",
-                      *formato_matriz(A), "",
-                      "Vector b: ( " + ", ".join(formato(v) for v in b) + " )",
-                      ""]
-            lineas += pasos_cramer(A, b)
-            lineas.append("SOLUCIÓN:")
-            for i, x_i in enumerate(soluciones):
-                lineas.append("   " + nombre_variable(i + 1) + " = " + formato(x_i))
-            mostrar_texto(self.raiz, "Regla de Cramer", "\n".join(lineas))
+            soluciones, det_A, dets = regla_de_cramer(A, b)
         except ValueError as error:
+            # A no cuadrada, b de otro tamano o det(A) = 0: no hay solucion
+            # unica, asi que Cramer no aplica y se avisa sin pintar nada.
             messagebox.showinfo("Regla de Cramer", str(error))
+            return
+        self.ultimo_resultado = {"pasos": pasos_cramer(A, b)}
+        self._mostrar_resultado_cramer(soluciones, det_A, dets)
+
+
+    def _mostrar_resultado_cramer(self, soluciones, det_A, dets):
+        """Pinta en el panel de resultado la solución obtenida por Cramer."""
+        self._limpiar_resultado()
+        self.boton_procedimiento.pack(side="right")
+
+        sub = self._sub_tarjeta("REGLA DE CRAMER", TEXTO_SUAVE)
+        cartel = tk.Frame(sub, bg=EXITO, padx=14, pady=10)
+        cartel.pack(fill="x", pady=(0, 4))
+        self._texto_ajustable(tk.Label(cartel, text="SOLUCIÓN ÚNICA",
+                                       font=self.fuente_cartel, bg=EXITO,
+                                       fg=FONDO)).pack(fill="x")
+        self._texto_ajustable(tk.Label(
+            sub, text="det(A) = " + formato(det_A) + " ≠ 0, así que A es "
+            "invertible y el sistema tiene solución única.",
+            font=self.fuente_body, bg=TARJETA, fg=TEXTO)).pack(fill="x",
+                                                               pady=(0, 6))
+        self._tabla_determinantes(sub, det_A, dets)
+
+        sub2 = self._sub_tarjeta("SOLUCIÓN DEL SISTEMA", ACENTO)
+        contenedor = tk.Frame(sub2, bg=FONDO, padx=12, pady=10)
+        contenedor.pack(fill="x", pady=(0, 8))
+        texto = "     ".join(nombre_variable(i + 1) + " = " + formato(v)
+                             for i, v in enumerate(soluciones))
+        self._texto_ajustable(tk.Label(contenedor, text=texto,
+                                       font=self.fuente_big, bg=FONDO,
+                                       fg=TEXTO)).pack(fill="x")
+
+        self._panel_procedimiento("DESARROLLO DE LA REGLA DE CRAMER",
+                                  self.ultimo_resultado["pasos"])
+
+
+    def _tabla_determinantes(self, padre, det_A, dets):
+        """Tabla con det(A) y cada det(Ai), con el mismo estilo que la
+        tabla de datos de «Resolver Sistema»."""
+        marco = tk.Frame(padre, bg="#00bcd4", bd=1)
+        marco.pack(pady=10)
+        filas = [("det(A)", formato(det_A))]
+        for i, det_i in enumerate(dets):
+            filas.append(("det(" + con_subindice("A" + str(i + 1)) + ")",
+                          formato(det_i)))
+        for i, (campo, valor) in enumerate(filas):
+            tk.Label(marco, text=campo, bg="#e0f7fa", fg="black", width=20,
+                     anchor="w", padx=8, pady=5, borderwidth=1,
+                     relief="solid", font=("Arial", 10)
+                     ).grid(row=i, column=0, sticky="nsew")
+            tk.Label(marco, text=valor, bg="white", fg="black", width=35,
+                     anchor="center", padx=8, pady=5, borderwidth=1,
+                     relief="solid", font=("Arial", 10)
+                     ).grid(row=i, column=1, sticky="nsew")
+
+
+    def _panel_procedimiento(self, titulo, pasos):
+        """Arma el panel plegable del procedimiento y lo deja oculto."""
+        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA,
+                                          highlightbackground=BOTON_SEC,
+                                          highlightthickness=1, bd=0)
+        tk.Label(self.sub_procedimiento, text=titulo, font=self.fuente_encab,
+                 bg=TARJETA, fg=TEXTO, anchor="w").pack(fill="x", padx=14,
+                                                        pady=(10, 6))
+        self._texto_ajustable(tk.Label(
+            self.sub_procedimiento, text="\n".join(pasos),
+            font=self.fuente_mono, bg=TARJETA, fg=TEXTO, justify="left",
+            anchor="nw")).pack(fill="x", padx=14, pady=(0, 10))
+        self.procedimiento_visible = False
+        self.boton_procedimiento.configure(text="Ver procedimiento")
+        self.lienzo_resultado.yview_moveto(0)
+        self.raiz.update_idletasks()
+        self._ajustar_textos()
 
 
     def _restaurar_bordes(self):
@@ -1089,25 +1155,8 @@ class CalculadoraApp:
 
 
         # ================= PROCEDIMIENTO =================
-        self.sub_procedimiento = tk.Frame(self.frame_resultado, bg=TARJETA,
-                                          highlightbackground=BOTON_SEC,
-                                          highlightthickness=1, bd=0)
-        tk.Label(self.sub_procedimiento, text="PROCESO DE ELIMINACIÓN (GAUSS-JORDAN)",
-                 font=self.fuente_encab, bg=TARJETA, fg=TEXTO, anchor="w"
-                 ).pack(fill="x", padx=14, pady=(10, 6))
-
-        self._texto_ajustable(tk.Label(self.sub_procedimiento,
-                                       text="\n".join(resultado["pasos"]),
-                                       font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
-                                       justify="left", anchor="nw"
-                                       )).pack(fill="x", padx=14, pady=(0, 10))
-
-
-        self.procedimiento_visible = False
-        self.boton_procedimiento.configure(text="Ver procedimiento")
-        self.lienzo_resultado.yview_moveto(0)
-        self.raiz.update_idletasks()
-        self._ajustar_textos()
+        self._panel_procedimiento("PROCESO DE ELIMINACIÓN (GAUSS-JORDAN)",
+                                  resultado["pasos"])
 
 
     def _alternar_procedimiento(self):
