@@ -221,7 +221,22 @@ TEOREMAS = {
    Si det(A) = 0, la matriz es SINGULAR (no tiene inversa).
 
    NOTA: la inversa se calcula en el modulo de Operaciones Matriciales,
-   por Gauss-Jordan y por matriz adjunta.""",
+   por Gauss-Jordan y por matriz adjunta.
+
+6. REGLA DE CRAMER
+   Si A es cuadrada de n×n y det(A) != 0, el sistema A·x = b tiene
+   solucion unica y cada incognita se obtiene con
+
+       x_i = det(A_i) / det(A)
+
+   donde A_i es la matriz A con su columna i REEMPLAZADA por el vector b.
+
+   Condiciones: A cuadrada, b con n entradas y det(A) != 0. Si det(A) = 0
+   la formula no se puede aplicar, porque no hay solucion unica.
+
+   Es util para sistemas pequenos y para despejar una sola incognita sin
+   resolver todo el sistema; para sistemas grandes conviene Gauss-Jordan,
+   porque Cramer necesita calcular n+1 determinantes.""",
 }
 
 
@@ -230,14 +245,10 @@ def texto_teoremas(modulo):
     return TEOREMAS.get(modulo, "No hay teoremas registrados para este módulo.")
 
 
-def mostrar_teoremas(raiz, modulo, titulo="Teoremas Clave del Módulo"):
-    """Abre una ventana con el resumen de teoremas del módulo.
-
-    Es la opción '0. Ver Teoremas Clave del Módulo' que pide la Tarea 4,
-    adaptada a la interfaz gráfica: en lugar de imprimirse en consola,
-    el resumen se despliega en una ventana con su propia barra de
-    desplazamiento.
-    """
+def mostrar_texto(raiz, titulo, texto):
+    """Abre una ventana de solo lectura con un texto largo y su barra de
+    desplazamiento. La usan el resumen de teoremas y el desarrollo de la
+    regla de Cramer, para no repetir el armado de la ventana."""
     ventana = tk.Toplevel(raiz)
     ventana.title(titulo)
     ventana.configure(bg="#FFFFFF")
@@ -258,7 +269,7 @@ def mostrar_teoremas(raiz, modulo, titulo="Teoremas Clave del Módulo"):
     caja.pack(side="left", fill="both", expand=True)
     barra.configure(command=caja.yview)
 
-    caja.insert("1.0", texto_teoremas(modulo))
+    caja.insert("1.0", texto)
     caja.configure(state="disabled")
 
     tk.Button(ventana, text="Cerrar", font=("Montserrat", 11, "bold"),
@@ -267,3 +278,14 @@ def mostrar_teoremas(raiz, modulo, titulo="Teoremas Clave del Módulo"):
 
     ventana.transient(raiz)
     return ventana
+
+
+def mostrar_teoremas(raiz, modulo, titulo="Teoremas Clave del Módulo"):
+    """Abre una ventana con el resumen de teoremas del módulo.
+
+    Es la opción '0. Ver Teoremas Clave del Módulo' que pide la Tarea 4,
+    adaptada a la interfaz gráfica: en lugar de imprimirse en consola,
+    el resumen se despliega en una ventana con su propia barra de
+    desplazamiento.
+    """
+    return mostrar_texto(raiz, titulo, texto_teoremas(modulo))

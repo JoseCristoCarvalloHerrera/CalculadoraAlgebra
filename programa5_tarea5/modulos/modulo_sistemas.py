@@ -39,7 +39,9 @@ from modulos import (
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_numero,
     leer_vector, leer_matriz, mostrar_matriz, pausa, preguntar,
 )
-from teoremas.resumen_teoremas import mostrar_teoremas, texto_teoremas
+from teoremas.resumen_teoremas import (mostrar_teoremas, mostrar_texto,
+                                      texto_teoremas)
+from modulos.modulo_determinantes import pasos_cramer, regla_de_cramer
 
 
 # =====================================================================
@@ -624,6 +626,9 @@ class CalculadoraApp:
         self._llenar_ecuaciones(tarjeta_ecuaciones)
 
 
+        self.boton_cramer = tk.Button(panel_izq, text="Resolver por la Regla de Cramer", font=self.fuente_body, bg=BOTON_SEC, fg=TEXTO, cursor="hand2", relief="flat", padx=18, pady=8, activebackground=BOTON_SEC_HOVER, activeforeground=TEXTO, command=self._al_cramer)
+        self.boton_cramer.pack(side="bottom", fill="x", pady=(6, 0))
+
         self.boton_resolver = tk.Button(panel_izq, text="Resolver Sistema", font=self.fuente_boton, bg=ACENTO, fg=FONDO, cursor="hand2", relief="flat", padx=18, pady=12, activebackground=ACENTO_HOVER, activeforeground=FONDO, command=self._al_resolver)
         self.boton_resolver.pack(side="bottom", fill="x", pady=(10, 0))
 
@@ -935,25 +940,34 @@ class CalculadoraApp:
         self._restaurar_bordes()
 
 
+    def _leer_sistema(self):
+        """Lee la matriz aumentada de la pantalla y devuelve (A, b).
+        Si alguna casilla tiene un valor inválido la señala y devuelve
+        (None, None), para que quien llama simplemente no siga."""
+        m, n = self.filas_actuales, self.columnas_actuales
+        A, b = [], []
+        for i in range(m):
+            fila = []
+            for j in range(n):
+                try: fila.append(a_numero(self.celdas[(i, j)].get()))
+                except ValueError:
+                    self._mostrar_error(f"Revisa la casilla fila {i+1}, columna {nombre_variable(j+1)}.", i, j)
+                    return None, None
+            A.append(fila)
+            try: b.append(a_numero(self.celdas[(i, n)].get()))
+            except ValueError:
+                self._mostrar_error(f"Revisa el vector 'b' de la fila {i+1}.", i, n)
+                return None, None
+        self._restaurar_bordes()
+        return A, b
+
+
     def _al_resolver(self):
         try:
             m, n = self.filas_actuales, self.columnas_actuales
-            A, b = [], []
-            for i in range(m):
-                fila = []
-                for j in range(n):
-                    try: fila.append(a_numero(self.celdas[(i, j)].get()))
-                    except ValueError as error:
-                        self._mostrar_error(f"Revisa la casilla fila {i+1}, columna {nombre_variable(j+1)}.", i, j)
-                        return
-                A.append(fila)
-                try: b.append(a_numero(self.celdas[(i, n)].get()))
-                except ValueError as error:
-                    self._mostrar_error(f"Revisa el vector 'b' de la fila {i+1}.", i, n)
-                    return
-
-
-            self._restaurar_bordes()
+            A, b = self._leer_sistema()
+            if A is None:
+                return
             resultado = resolver_sistema(m, n, A, b)
             self.ultimo_resultado = resultado
             self._mostrar_resultado(resultado)
@@ -961,6 +975,27 @@ class CalculadoraApp:
 
         except Exception as error:
             messagebox.showerror("Error inesperado", f"Ocurrió un problema:\n{error}")
+
+
+    def _al_cramer(self):
+        """Resuelve el sistema de la pantalla con la regla de Cramer y
+        muestra el desarrollo completo en una ventana aparte."""
+        A, b = self._leer_sistema()
+        if A is None:
+            return
+        try:
+            soluciones, _, _ = regla_de_cramer(A, b)
+            lineas = ["REGLA DE CRAMER", "", "Matriz A:",
+                      *formato_matriz(A), "",
+                      "Vector b: ( " + ", ".join(formato(v) for v in b) + " )",
+                      ""]
+            lineas += pasos_cramer(A, b)
+            lineas.append("SOLUCIÓN:")
+            for i, x_i in enumerate(soluciones):
+                lineas.append("   " + nombre_variable(i + 1) + " = " + formato(x_i))
+            mostrar_texto(self.raiz, "Regla de Cramer", "\n".join(lineas))
+        except ValueError as error:
+            messagebox.showinfo("Regla de Cramer", str(error))
 
 
     def _restaurar_bordes(self):

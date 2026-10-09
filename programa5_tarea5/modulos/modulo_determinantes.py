@@ -25,6 +25,10 @@
  a forma triangular, que es el método eficiente: la expansión por
  cofactores necesita del orden de n! multiplicaciones y la reducción n³.
 
+ Incluye también la REGLA DE CRAMER, que resuelve A·x = b usando solo
+ determinantes: x_i = det(A_i)/det(A), donde A_i es A con su columna i
+ reemplazada por b. Solo se puede aplicar si A es cuadrada y det(A) != 0.
+
  Restricción cumplida:
    - Solo se usa Python estándar (fractions). NO se usan NumPy, SciPy
      ni funciones de álgebra lineal de math.
@@ -35,8 +39,9 @@ from fractions import Fraction
 
 from modulos import (
     formato, _validar_matriz, _leer_dimensiones, LOGO_DETERMINANTES,
+    con_subindice, nombre_variable,
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_matriz,
-    mostrar_matriz, pausa, preguntar,
+    leer_vector, mostrar_matriz, pausa, preguntar,
 )
 from teoremas.resumen_teoremas import texto_teoremas
 
@@ -190,6 +195,55 @@ def determinante_por_reduccion(A):
     return (-producto if intercambios % 2 else producto), intercambios, M
 
 
+# =====================================================================
+# REGLA DE CRAMER
+# Resuelve A·x = b usando solo determinantes, sin reducir por filas.
+# Solo sirve cuando A es cuadrada y det(A) != 0.
+# =====================================================================
+
+def sustituir_columna(A, indice, b):
+    """Devuelve una copia de A con la columna 'indice' reemplazada por b.
+    Es la matriz que la regla de Cramer llama Ai."""
+    return [[b[i] if j == indice else A[i][j] for j in range(len(A[i]))]
+            for i in range(len(A))]
+
+
+def regla_de_cramer(A, b):
+    """Resuelve A·x = b por la regla de Cramer: xi = det(Ai)/det(A).
+    Devuelve (soluciones, det_A, dets) para poder mostrar el desarrollo.
+    Lanza ValueError si A no es cuadrada, si b no tiene n entradas o si
+    det(A) = 0, porque entonces no hay solucion unica."""
+    n = validar_cuadrada(A)
+    if len(b) != n:
+        raise ValueError("El vector b debe tener " + str(n) + " entradas; "
+                         "tiene " + str(len(b)) + ".")
+    det_A = determinante(A)
+    # Cramer divide entre det(A): si vale 0 no hay solucion unica y la
+    # formula no se puede aplicar.
+    if det_A == 0:
+        raise ValueError("det(A) = 0: el sistema no tiene solucion unica, "
+                         "asi que no se puede aplicar la regla de Cramer.")
+    dets = [determinante(sustituir_columna(A, i, b)) for i in range(n)]
+    return [d / det_A for d in dets], det_A, dets
+
+
+def pasos_cramer(A, b):
+    """Arma las lineas del desarrollo de Cramer para mostrarlas en pantalla."""
+    soluciones, det_A, dets = regla_de_cramer(A, b)
+    lineas = ["det(A) = " + formato(det_A) + "  (distinto de cero: hay "
+              "solucion unica)", ""]
+    for i, (det_i, x_i) in enumerate(zip(dets, soluciones)):
+        nombre_ai = con_subindice("A" + str(i + 1))
+        lineas.append(nombre_ai + ": se sustituye la columna " + str(i + 1)
+                      + " de A por el vector b")
+        lineas.append("   det(" + nombre_ai + ") = " + formato(det_i))
+        lineas.append("   " + nombre_variable(i + 1) + " = det(" + nombre_ai
+                      + ") / det(A) = " + formato(det_i) + " / "
+                      + formato(det_A) + " = " + formato(x_i))
+        lineas.append("")
+    return lineas
+
+
 def es_invertible(A):
     """Una matriz cuadrada es invertible si y solo si su determinante
     es distinto de cero. Se usará en el módulo de la matriz inversa."""
@@ -207,6 +261,7 @@ def menu_consola():
         print("   0. Ver Teoremas Clave del Módulo")
         print("   1. Calcular el determinante de una matriz cuadrada")
         print("   2. ¿La matriz es invertible?")
+        print("   3. Resolver un sistema por la regla de Cramer")
         print("   9. Volver al menú principal")
         print()
         opcion = preguntar("   Elegí una opción: ").strip()
@@ -219,6 +274,8 @@ def menu_consola():
             pausa()
         elif opcion in ("1", "2"):
             _consola_determinante(opcion == "2")
+        elif opcion == "3":
+            _consola_cramer()
         else:
             print("   Opción no válida.")
             pausa()
@@ -250,6 +307,32 @@ def _consola_determinante(preguntar_inversa):
             else:
                 print("   det(A) = 0  ->  la matriz NO es invertible (es SINGULAR).")
                 print("   Sus columnas son linealmente dependientes.")
+    except ValueError as error:
+        print("\n   " + str(error))
+    pausa()
+
+
+def _consola_cramer():
+    """Pide A y b, y resuelve el sistema con la regla de Cramer."""
+    mostrar_cabecera(LOGO_DETERMINANTES)
+    print("   RESOLVER A·x = b POR LA REGLA DE CRAMER")
+    print("   (solo para sistemas con A cuadrada y det(A) distinto de cero)")
+    print()
+    try:
+        n = leer_entero("   Número de ecuaciones e incógnitas (n) = ")
+        print()
+        A = leer_matriz("A", n, n)
+        print()
+        b = leer_vector("b", n)
+        soluciones, det_A, _ = regla_de_cramer(A, b)
+        print()
+        mostrar_matriz(A, titulo="   MATRIZ A:")
+        print()
+        for linea in pasos_cramer(A, b):
+            print("   " + linea)
+        print("   SOLUCIÓN:")
+        for i, x_i in enumerate(soluciones):
+            print("      " + nombre_variable(i + 1) + " = " + formato(x_i))
     except ValueError as error:
         print("\n   " + str(error))
     pausa()
