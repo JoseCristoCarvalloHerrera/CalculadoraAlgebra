@@ -1,49 +1,25 @@
 # -*- coding: utf-8 -*-
 """
-=====================================================================
- PROGRAMA 4 - GRUPO 2
- Calculadora de Álgebra Lineal - Proyecto Integrador
- Módulo II: Vectores e Independencia Lineal
- MENÚ PRINCIPAL (punto de entrada de la aplicación)
-=====================================================================
- UNIVERSIDAD AMERICANA
- Facultad de Ingeniería y Arquitectura (FIA)
- Asignatura: Álgebra Lineal (MTM0120)
- Segundo Corte Evaluativo
+Calculadora de Álgebra Lineal - Programa 5 - Grupo #2.
 
- ARQUITECTURA MODULAR (Tarea 4)
- -----------------------------------------------------------------
- A partir del Programa 4 la calculadora deja de ser un script único
- y se organiza en paquetes por carpetas:
+Punto de entrada del proyecto integrador. Abre el menú principal en
+ventana (Tkinter) o en consola, y desde ahí se llega a los cuatro
+módulos: sistemas de ecuaciones, vectores e independencia lineal,
+álgebra de matrices con determinantes e inversa, y determinantes.
 
-   Programa 4_Grupo2.py        <-- este archivo: el menú principal
-   modulos/
-       __init__.py             <-- constantes, formato de números,
-                                   validadores y logotipos ASCII
-       modulo_sistemas.py      <-- Módulo 1: Sistemas (SEL) + el motor
-                                   de reducción Gauss-Jordan
-       modulo_vectores.py      <-- Módulo 2: Vectores e Indep. Lineal
-       modulo_matrices.py      <-- Módulo 3: Álgebra de matrices
-       modulo_determinantes.py <-- Módulo 4: Determinantes
-   teoremas/
-       __init__.py
-       resumen_teoremas.py     <-- opción "Ver Teoremas Clave del Módulo"
+Temas de clase: Sesiones 1 a 11 de Álgebra Lineal (MTM0120).
 
- El motor de reducción por filas vive en modulo_sistemas.py y los
- demás módulos lo reutilizan. No es casualidad: por el teorema de la
- ecuación vectorial, preguntar si un conjunto es linealmente
- independiente o si un vector es combinación lineal de otros se
- responde resolviendo un sistema lineal.
+Elaborado por el Grupo #2: Marian Alejandra Guillén Castillo,
+Chelsea Yosmara Quintanilla Blandón, José Cristo Carvallo Herrera y
+Gabriela Suyen Espinoza Rodríguez.
 
- CÓMO SE EJECUTA
- -----------------------------------------------------------------
-   python "Programa 4_Grupo2.py"              -> abre la aplicación
-   python "Programa 4_Grupo2.py" --pruebas    -> corre las pruebas
+Modos de ejecución:
+    python main.py              abre la ventana
+    python main.py --consola    abre el menú de texto
+    python main.py --pruebas    ejecuta las comprobaciones automáticas
 
- Restricción cumplida:
-   - Solo se usa Python estándar (tkinter, fractions). NO se usan
-     NumPy, SciPy ni funciones de álgebra lineal de math.
-=====================================================================
+Restricción cumplida: solo Python estándar (fractions, tkinter).
+No se usan NumPy, SciPy ni funciones de álgebra lineal de math.
 """
 
 import sys
@@ -70,8 +46,12 @@ from modulos.modulo_vectores import (
 from modulos.modulo_matrices import (
     MatricesOpsApp, sumar_matrices, restar_matrices, escalar_por_matriz,
     multiplicar_matrices, resolver_ecuacion_matricial, transponer_matriz,
+    inversa_gauss_jordan, inversa_por_adjunta, matriz_adjunta,
+    comprobar_inversa, verificar_propiedad_inversa, PROPIEDADES_INVERSA,
 )
-from modulos.modulo_determinantes import determinante, es_invertible
+from modulos.modulo_determinantes import (
+    determinante, es_invertible, determinante_sarrus, determinante_por_reduccion,
+)
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
 from modulos import modulo_sistemas, modulo_vectores, modulo_matrices, modulo_determinantes
 from teoremas.resumen_teoremas import mostrar_teoremas
@@ -137,8 +117,12 @@ class MenuPrincipal:
         MatricesOpsApp(self.raiz, callback_volver=self.mostrar_menu)
 
     def abrir_determinantes(self):
-        """El Módulo 4 se entrega con su motor de cálculo y su resumen de
-        teoremas; la pantalla completa se construye en el Programa 5."""
+        """Abre el resumen de teoremas del Módulo 4.
+        El motor de cálculo del módulo vive en modulos/modulo_determinantes.py
+        (cofactores, Sarrus y reducción a triangular). No tiene pantalla propia
+        porque opera sobre la misma matriz A que el resto de operaciones: sus
+        botones están en Operaciones Matriciales para no pedir la matriz dos
+        veces."""
         mostrar_teoremas(self.raiz, "determinantes",
                          "Módulo 4: Determinantes y Propiedades")
 
@@ -469,6 +453,64 @@ def ejecutar_pruebas():
     # -----------------------------------------------------------------
     # PRUEBAS DEL PROGRAMA 4: INDEPENDENCIA LINEAL Y DETERMINANTES
     # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # PRUEBAS DEL PROGRAMA 5: DETERMINANTES E INVERSA
+    # -----------------------------------------------------------------
+    print("--------------------------------")
+    print("PRUEBAS DE INVERSA Y DETERMINANTE (PROGRAMA 5)")
+    print("--------------------------------")
+
+    A_inv = [[fr(1), fr(2), fr(3)], [fr(0), fr(1), fr(4)], [fr(5), fr(6), fr(0)]]
+    esperada = [[fr(-24), fr(18), fr(5)], [fr(20), fr(-15), fr(-4)],
+                [fr(-5), fr(4), fr(1)]]
+    probar("Inversa por Gauss-Jordan 3x3",
+           inversa_gauss_jordan(A_inv) == esperada)
+    probar("Inversa por matriz adjunta 3x3",
+           inversa_por_adjunta(A_inv) == esperada)
+    probar("Los dos métodos dan la misma inversa",
+           inversa_gauss_jordan(A_inv) == inversa_por_adjunta(A_inv))
+    _, cumple_identidad = comprobar_inversa(A_inv, inversa_gauss_jordan(A_inv))
+    probar("Comprobación A·A⁻¹ = I", cumple_identidad)
+
+    A2 = [[fr(1), fr(2)], [fr(3), fr(4)]]
+    probar("adj(A) de una 2x2",
+           matriz_adjunta(A2) == [[fr(4), fr(-2)], [fr(-3), fr(1)]])
+    probar("Inversa 2x2 con fracciones exactas",
+           inversa_gauss_jordan(A2) == [[fr(-2), fr(1)],
+                                        [fr("3/2"), fr("-1/2")]])
+
+    singular = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)], [fr(7), fr(8), fr(9)]]
+    for nombre, funcion in (("Gauss-Jordan", inversa_gauss_jordan),
+                            ("adjunta", inversa_por_adjunta)):
+        try:
+            funcion(singular)
+            probar("Matriz singular avisa (" + nombre + ")", False, "No lanzó ValueError")
+        except ValueError:
+            probar("Matriz singular avisa (" + nombre + ")", True)
+
+    A_det = [[fr(1), fr(3), fr(-3)], [fr(2), fr(0), fr(1)], [fr(-1), fr(4), fr(-2)]]
+    probar("Sarrus coincide con cofactores",
+           determinante_sarrus(A_det) == determinante(A_det) == fr(-19))
+    probar("Reducción coincide con cofactores (3x3)",
+           determinante_por_reduccion(A_det)[0] == fr(-19))
+    A4 = [[fr(2), fr(1), fr(0), fr(3)], [fr(3), fr(0), fr(-2), fr(0)],
+          [fr(4), fr(-1), fr(1), fr(2)], [fr(5), fr(2), fr(0), fr(1)]]
+    probar("Reducción coincide con cofactores (4x4)",
+           determinante_por_reduccion(A4)[0] == determinante(A4) == fr(85))
+    try:
+        determinante_sarrus(A2)
+        probar("Sarrus rechaza las que no son 3x3", False, "No lanzó ValueError")
+    except ValueError:
+        probar("Sarrus rechaza las que no son 3x3", True)
+
+    # Las seis propiedades de las Sesiones 10 y 11, con A y B del enunciado
+    B_prop = [[fr(0), fr(1)], [fr(1), fr(1)]]
+    for indice, nombre in enumerate(PROPIEDADES_INVERSA):
+        resultado = verificar_propiedad_inversa(indice, A2, B_prop,
+                                                fila_i=1, fila_j=0, k=fr(3))
+        probar("Propiedad " + str(indice + 1) + ": " + nombre,
+               resultado["se_cumple"])
+
     print("--------------------------------")
     print("PRUEBAS DE INDEPENDENCIA LINEAL (PROGRAMA 4)")
     print("--------------------------------")

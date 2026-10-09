@@ -1,0 +1,291 @@
+# -*- coding: utf-8 -*-
+"""
+=====================================================================
+ RESUMEN DE TEOREMAS Y PROPIEDADES CLAVE
+ Calculadora de Álgebra Lineal - Proyecto Integrador - GRUPO 2
+=====================================================================
+ UNIVERSIDAD AMERICANA
+ Facultad de Ingeniería y Arquitectura (FIA)
+ Asignatura: Álgebra Lineal (MTM0120)
+ Segundo Corte Evaluativo - Programa 4
+
+ Cada módulo de la calculadora ofrece la opción
+     0. Ver Teoremas Clave del Módulo
+ y esa opción muestra el texto que está en este archivo. Se mantiene
+ aparte para que los teoremas se puedan corregir o ampliar sin tocar
+ el código de los módulos.
+=====================================================================
+"""
+
+import tkinter as tk
+
+
+TEOREMAS = {
+
+    "sistemas": """TEOREMAS CLAVE - MODULO 1: SISTEMAS DE ECUACIONES LINEALES
+
+1. FORMA ESCALONADA (3 propiedades)
+   a) Todas las filas distintas de cero estan ARRIBA de las filas de ceros.
+   b) Cada entrada principal esta en una columna a la DERECHA de la
+      entrada principal de la fila superior.
+   c) Debajo de cada entrada principal, todas las entradas son cero.
+
+2. FORMA ESCALONADA REDUCIDA (las 3 anteriores + 2 mas)
+   d) La entrada principal de cada fila no nula es 1.
+   e) Cada 1 principal es el UNICO valor distinto de cero de su columna.
+
+   La forma escalonada NO es unica; la escalonada reducida SI lo es.
+
+3. TEOREMA DE EXISTENCIA Y UNICIDAD
+   Un sistema lineal es CONSISTENTE si y solo si la ultima columna de
+   la matriz aumentada NO es columna pivote; es decir, si al reducir no
+   aparece ninguna fila de la forma  [0 0 ... 0 | k]  con k distinto de 0.
+
+   Si es consistente:
+      - sin variables libres  -> solucion UNICA      (determinado)
+      - con variables libres  -> INFINITAS soluciones (indeterminado)
+
+4. RANGO Y VARIABLES LIBRES
+   rango(A) = numero de pivotes en la matriz de coeficientes.
+   numero de variables libres = n - rango(A),  con n = numero de variables.
+
+   rango(A) = rango(A|b)  ->  consistente
+   rango(A) != rango(A|b) ->  inconsistente
+
+5. OPERACIONES ELEMENTALES POR FILAS
+   Intercambio, escalamiento (por k distinto de 0) y reemplazo.
+   No alteran el conjunto solucion: la matriz original y la reducida
+   son equivalentes por filas y representan el mismo sistema.""",
+
+
+    "vectores": """TEOREMAS CLAVE - MODULO 2: VECTORES E INDEPENDENCIA LINEAL
+
+1. COMBINACION LINEAL (definicion)
+   Dados v1, v2, ..., vk en R^n y escalares c1, c2, ..., ck, el vector
+        y = c1·v1 + c2·v2 + ... + ck·vk
+   se llama combinacion lineal de v1...vk con pesos c1...ck.
+
+2. TEOREMA DE LA ECUACION VECTORIAL
+   La ecuacion vectorial
+        x1·a1 + x2·a2 + ... + xn·an = b
+   tiene el MISMO conjunto solucion que el sistema lineal cuya matriz
+   aumentada es  [a1  a2  ...  an | b].
+
+   En particular, b se puede generar como combinacion lineal de
+   a1...an SI Y SOLO SI ese sistema lineal tiene solucion.
+
+3. TEOREMA DE INDEPENDENCIA LINEAL
+   Un conjunto de k vectores en R^n es LINEALMENTE INDEPENDIENTE si y
+   solo si la UNICA solucion de
+        c1·v1 + c2·v2 + ... + ck·vk = 0
+   es la trivial  c1 = c2 = ... = ck = 0  (es decir, SIN variables libres).
+
+   Si existe alguna solucion con los coeficientes NO todos cero, el
+   conjunto es LINEALMENTE DEPENDIENTE.
+
+4. CRITERIO PRACTICO POR PIVOTES
+   Se forma la matriz A cuyas COLUMNAS son los vectores y se reduce el
+   sistema homogeneo [A | 0]:
+        numero de pivotes = k   ->  L.I.  (no sobra ninguna columna)
+        numero de pivotes < k   ->  L.D.  (hay variables libres)
+   Equivalentemente:  variables libres = k - numero de pivotes.
+
+5. SISTEMA HOMOGENEO Ax = 0
+   Siempre es CONSISTENTE, porque x = 0 siempre lo satisface (solucion
+   trivial). Tiene solucion NO trivial si y solo si tiene al menos una
+   variable libre.
+
+6. CONSECUENCIA POR CONTEO
+   Si k > n (mas vectores que la dimension del espacio), el conjunto es
+   SIEMPRE linealmente dependiente, porque el rango no puede superar n.""",
+
+
+    "matrices": """TEOREMAS CLAVE - MODULO 3: ALGEBRA DE MATRICES
+
+1. SUMA Y MULTIPLO ESCALAR
+   A + B esta definida SOLO si A y B tienen el mismo tamano m×n, y se
+   calcula entrada por entrada. El multiplo escalar rA multiplica cada
+   entrada de A por r.
+
+2. PRODUCTO MATRIZ-VECTOR  Ax
+   Si A es m×n con columnas a1...an y x esta en R^n, entonces
+        Ax = x1·a1 + x2·a2 + ... + xn·an
+   es decir, Ax ES la combinacion lineal de las COLUMNAS de A usando
+   como pesos las entradas de x.
+   Ax esta definido solo si el numero de columnas de A es igual al
+   numero de entradas de x.
+
+3. PROPIEDADES DE LINEALIDAD DE Ax
+   Para u, v en R^n y c escalar:
+        A(u + v) = Au + Av        (aditividad)
+        A(c·u)   = c·(Au)         (homogeneidad)
+
+4. MULTIPLICACION DE MATRICES - REGLA FILA COLUMNA
+   Si A es m×n y B es n×p, entonces AB es m×p y
+        (AB)ij = ai1·b1j + ai2·b2j + ... + ain·bnj
+   Esta definida SOLO si las columnas de A son iguales a las filas de B.
+
+5. PROPIEDADES DEL PRODUCTO
+   A(BC) = (AB)C           (asociativa)
+   A(B + C) = AB + AC      (distributiva izquierda)
+   (B + C)A = BA + CA      (distributiva derecha)
+   r(AB) = (rA)B = A(rB)
+   In·A = A = A·In         (identidad)
+
+   ATENCION: en general  AB != BA.  El producto NO es conmutativo.
+
+6. TRASPUESTA
+   (A^T)^T = A
+   (A + B)^T = A^T + B^T
+   (rA)^T = r·A^T
+   (AB)^T = B^T · A^T      (se invierte el orden)
+
+7. MATRIZ INVERSA (Sesion 10)
+   A de n×n es INVERTIBLE si existe C de n×n con  CA = I  y  AC = I.
+   Esa C es unica y se denota A^-1. Una matriz invertible se llama NO
+   SINGULAR; una que no lo es, SINGULAR. Solo las cuadradas pueden serlo.
+
+   Caso 2×2:  si ad - bc != 0,  [a b; c d]^-1 = (1/(ad-bc))·[d -b; -c a]
+
+   Teorema de las propiedades de la inversa:
+   a) (A^-1)^-1 = A
+   b) (AB)^-1 = B^-1·A^-1        (se invierte el orden)
+   c) (A^T)^-1 = (A^-1)^T
+
+8. COMO SE CALCULA LA INVERSA
+   Por GAUSS-JORDAN: se forma [A | I] y se reduce por filas. Si A es
+   equivalente por filas a I, queda [I | A^-1]. Si no llega a tener n
+   pivotes, es singular y se detiene.
+
+   Por MATRIZ ADJUNTA:  A^-1 = (1/det(A)) · adj(A),  solo si det(A) != 0,
+   donde adj(A) es la TRANSPUESTA de la matriz de cofactores.
+   Los dos metodos dan la misma inversa.
+
+   Si A es invertible, Ax = b tiene la solucion unica  x = A^-1·b.
+
+9. TEOREMA DE LA MATRIZ INVERTIBLE
+   Para A cuadrada de n×n, los siguientes enunciados son EQUIVALENTES:
+   todos son ciertos o todos son falsos.
+
+   a) A es invertible.
+   b) A es equivalente por filas a la identidad de n×n.
+   c) * A tiene n POSICIONES PIVOTE.
+   d) Ax = 0 tiene solamente la solucion trivial.
+   e) * Las columnas de A forman un conjunto LINEALMENTE INDEPENDIENTE.
+   f) La transformacion x -> Ax es uno a uno.
+   g) Ax = b tiene al menos una solucion para toda b en R^n.
+   h) * Las columnas de A GENERAN R^n.
+   i) La transformacion x -> Ax mapea R^n sobre R^n.
+   j) Existe C de n×n tal que CA = I.
+   k) Existe D de n×n tal que AD = I.
+   l) A^T es invertible.
+
+   Y uniendo con los determinantes:
+        A es invertible  <=>  det(A) != 0  <=>  A^-1 = (1/det(A))·adj(A)
+
+   Las marcadas con * son las que la calculadora comprueba de forma
+   directa; las demas se siguen de ellas por este mismo teorema.""",
+
+
+    "determinantes": """TEOREMAS CLAVE - MODULO 4: DETERMINANTES Y PROPIEDADES
+
+1. DEFINICION POR COFACTORES
+   Para A de n×n, expandiendo sobre la primera fila:
+        det(A) = a11·C11 + a12·C12 + ... + a1n·C1n
+   donde  Cij = (-1)^(i+j) · det(Mij)  y Mij es la submatriz que queda
+   al tachar la fila i y la columna j.
+
+   Caso 2×2:   det [a b; c d] = ad - bc
+
+2. DETERMINANTE Y TIPO DE MATRIZ
+   Si A es triangular (superior o inferior) o diagonal, det(A) es el
+   PRODUCTO de los elementos de la diagonal.
+   det(In) = 1.   Si A tiene una fila o columna de ceros, det(A) = 0.
+
+3. EFECTO DE LAS OPERACIONES ELEMENTALES
+   Intercambiar dos filas       ->  el determinante cambia de SIGNO.
+   Multiplicar una fila por k   ->  el determinante se multiplica por k.
+   Sumar a una fila un multiplo
+   de otra (reemplazo)          ->  el determinante NO cambia.
+
+4. PROPIEDADES DEL PRODUCTO
+   det(AB) = det(A)·det(B)
+   det(A^T) = det(A)
+   det(rA) = r^n · det(A)   para A de n×n
+
+5. CRITERIO DE INVERTIBILIDAD
+   A es INVERTIBLE  si y solo si  det(A) != 0.
+   Equivalentemente: A es invertible si y solo si sus columnas son
+   linealmente independientes, y si y solo si A tiene n pivotes.
+
+   Si det(A) = 0, la matriz es SINGULAR (no tiene inversa).
+
+   NOTA: la inversa se calcula en el modulo de Operaciones Matriciales,
+   por Gauss-Jordan y por matriz adjunta.
+
+6. REGLA DE CRAMER
+   Si A es cuadrada de n×n y det(A) != 0, el sistema A·x = b tiene
+   solucion unica y cada incognita se obtiene con
+
+       x_i = det(A_i) / det(A)
+
+   donde A_i es la matriz A con su columna i REEMPLAZADA por el vector b.
+
+   Condiciones: A cuadrada, b con n entradas y det(A) != 0. Si det(A) = 0
+   la formula no se puede aplicar, porque no hay solucion unica.
+
+   Es util para sistemas pequenos y para despejar una sola incognita sin
+   resolver todo el sistema; para sistemas grandes conviene Gauss-Jordan,
+   porque Cramer necesita calcular n+1 determinantes.""",
+}
+
+
+def texto_teoremas(modulo):
+    """Devuelve el resumen de teoremas del módulo pedido."""
+    return TEOREMAS.get(modulo, "No hay teoremas registrados para este módulo.")
+
+
+def mostrar_texto(raiz, titulo, texto):
+    """Abre una ventana de solo lectura con un texto largo y su barra de
+    desplazamiento. La usan el resumen de teoremas y el desarrollo de la
+    regla de Cramer, para no repetir el armado de la ventana."""
+    ventana = tk.Toplevel(raiz)
+    ventana.title(titulo)
+    ventana.configure(bg="#FFFFFF")
+    ventana.geometry("820x600")
+
+    tk.Label(ventana, text=titulo, font=("Montserrat", 15, "bold"),
+             bg="#FFFFFF", fg="#0077B6").pack(anchor="w", padx=18, pady=(14, 8))
+
+    marco = tk.Frame(ventana, bg="#FFFFFF")
+    marco.pack(fill="both", expand=True, padx=18, pady=(0, 14))
+
+    barra = tk.Scrollbar(marco)
+    barra.pack(side="right", fill="y")
+
+    caja = tk.Text(marco, wrap="word", font=("Consolas", 10),
+                   bg="#FFFFFF", fg="#000000", relief="solid", bd=1,
+                   yscrollcommand=barra.set, padx=12, pady=10)
+    caja.pack(side="left", fill="both", expand=True)
+    barra.configure(command=caja.yview)
+
+    caja.insert("1.0", texto)
+    caja.configure(state="disabled")
+
+    tk.Button(ventana, text="Cerrar", font=("Montserrat", 11, "bold"),
+              bg="#0077B6", fg="#FFFFFF", relief="flat", cursor="hand2",
+              padx=20, pady=8, command=ventana.destroy).pack(pady=(0, 14))
+
+    ventana.transient(raiz)
+    return ventana
+
+
+def mostrar_teoremas(raiz, modulo, titulo="Teoremas Clave del Módulo"):
+    """Abre una ventana con el resumen de teoremas del módulo.
+
+    Es la opción '0. Ver Teoremas Clave del Módulo' que pide la Tarea 4,
+    adaptada a la interfaz gráfica: en lugar de imprimirse en consola,
+    el resumen se despliega en una ventana con su propia barra de
+    desplazamiento.
+    """
+    return mostrar_texto(raiz, titulo, texto_teoremas(modulo))
