@@ -39,7 +39,8 @@ from modulos.modulo_vectores import (
 )
 from modulos.modulo_determinantes import (
     determinante, submatriz, validar_cuadrada, determinante_por_reduccion,
-    determinante_sarrus, es_invertible,
+    determinante_sarrus, es_invertible, pasos_determinante, pasos_reduccion,
+    pasos_sarrus,
 )
 from teoremas.resumen_teoremas import mostrar_teoremas, texto_teoremas
 
@@ -150,11 +151,45 @@ def _buscar_fila_pivote(M, columna, n):
     return None
 
 
-def inversa_gauss_jordan(A):
+def _anotar_aumentada(pasos, titulo, M, n):
+    """Agrega a los pasos un título y la matriz aumentada [ · | · ] con la
+    barra dibujada en la columna n. Si pasos es None no hace nada."""
+    if pasos is None:
+        return
+    pasos.append(titulo)
+    pasos.extend(formato_matriz(M, col_barra=n))
+    pasos.append("")
+
+
+def _normalizar_pivote(M, col, n, pasos):
+    """Divide la fila del pivote para dejar un 1 en la diagonal."""
+    pivote = M[col][col]
+    if pivote == 1:
+        return
+    M[col] = [v / pivote for v in M[col]]
+    _anotar_aumentada(pasos, "F" + str(col + 1) + " -> F" + str(col + 1)
+                      + " / (" + formato(pivote) + ")   para dejar un 1 en el "
+                      "pivote", M, n)
+
+
+def _anular_columna(M, col, n, pasos):
+    """Hace ceros arriba y abajo del pivote de esa columna (fase de Jordan)."""
+    for f in range(n):
+        if f != col and M[f][col] != 0:
+            factor = M[f][col]
+            M[f] = [M[f][j] - factor * M[col][j] for j in range(2 * n)]
+            _anotar_aumentada(pasos, "F" + str(f + 1) + " -> F" + str(f + 1)
+                              + " - (" + formato(factor) + ")·F"
+                              + str(col + 1), M, n)
+
+
+def inversa_gauss_jordan(A, pasos=None):
     """Devuelve A⁻¹ reduciendo [A|I] por filas hasta llegar a [I|A⁻¹].
-    A: matriz cuadrada n×n. Lanza ValueError si A es singular."""
+    A: matriz cuadrada n×n. Lanza ValueError si A es singular.
+    Si se le pasa una lista, va anotando cada operación y la matriz."""
     n = validar_cuadrada(A)
     M = _aumentar_con_identidad(A, n)
+    _anotar_aumentada(pasos, "Se forma la matriz aumentada [A | I]:", M, n)
 
     for col in range(n):
         fila = _buscar_fila_pivote(M, col, n)
@@ -166,16 +201,28 @@ def inversa_gauss_jordan(A):
                 "pivote en la columna " + str(col + 1) + ".")
         if fila != col:
             M[col], M[fila] = M[fila], M[col]
+            _anotar_aumentada(pasos, "F" + str(col + 1) + " <-> F"
+                              + str(fila + 1) + "   para subir un pivote no "
+                              "nulo", M, n)
+        _normalizar_pivote(M, col, n, pasos)
+        _anular_columna(M, col, n, pasos)
 
-        pivote = M[col][col]
-        M[col] = [v / pivote for v in M[col]]
-
-        for f in range(n):
-            if f != col and M[f][col] != 0:
-                factor = M[f][col]
-                M[f] = [M[f][j] - factor * M[col][j] for j in range(2 * n)]
-
+    if pasos is not None:
+        pasos.append("La mitad izquierda ya es la identidad, así que la mitad")
+        pasos.append("derecha es A⁻¹.")
+        pasos.append("")
     return [fila[n:] for fila in M]          # la mitad derecha ya es A⁻¹
+
+
+def pasos_inversa_gauss_jordan(A):
+    """Desarrollo completo de [A|I] -> [I|A⁻¹], operación por operación."""
+    pasos = ["INVERSA POR GAUSS-JORDAN", "",
+             "Se escribe A junto a la identidad y se reduce por filas. Cada",
+             "operación se aplica a las dos mitades a la vez.", ""]
+    inversa = inversa_gauss_jordan(A, pasos)
+    pasos.append("A⁻¹:")
+    pasos.extend(formato_matriz(inversa))
+    return pasos
 
 
 def matriz_cofactores(A):
@@ -195,6 +242,53 @@ def matriz_cofactores(A):
 def matriz_adjunta(A):
     """Devuelve adj(A): la transpuesta de la matriz de cofactores de A."""
     return transponer_matriz(matriz_cofactores(A))
+
+
+def pasos_cofactor(A, i, j, pasos):
+    """Agrega al desarrollo el cofactor Cij: el menor que queda al tachar la
+    fila i y la columna j, su determinante y el signo que le corresponde."""
+    menor = submatriz(A, i, j)
+    signo = 1 if (i + j) % 2 == 0 else -1
+    etiqueta = str(i + 1) + str(j + 1)
+    pasos.append("C" + etiqueta + ":  se tacha la fila " + str(i + 1)
+                 + " y la columna " + str(j + 1) + ",  signo (-1)^("
+                 + str(i + 1) + "+" + str(j + 1) + ") = "
+                 + ("+1" if signo > 0 else "-1"))
+    pasos.extend("   " + linea for linea in formato_matriz(menor))
+    valor = signo * determinante(menor)
+    pasos.append("   det(M" + etiqueta + ") = " + formato(determinante(menor))
+                 + "   ->   C" + etiqueta + " = " + formato(valor))
+    pasos.append("")
+    return valor
+
+
+def pasos_inversa_adjunta(A):
+    """Desarrollo completo de A⁻¹ = (1/det A)·adj(A): el determinante, cada
+    cofactor con su menor, la matriz de cofactores, su transpuesta y la
+    multiplicación final por 1/det(A)."""
+    n = validar_cuadrada(A)
+    det = determinante(A)
+    pasos = ["INVERSA POR MATRIZ ADJUNTA", "",
+             "A⁻¹ = (1 / det(A)) · adj(A),  con adj(A) = transpuesta de la",
+             "matriz de cofactores.", "",
+             "Paso 1. Determinante:  det(A) = " + formato(det), ""]
+    if det == 0:
+        pasos.append("det(A) = 0: la matriz es singular y no tiene inversa.")
+        return pasos
+    pasos.append("Paso 2. Cofactores, uno por uno:")
+    pasos.append("")
+    cofactores = [[pasos_cofactor(A, i, j, pasos) for j in range(n)]
+                  for i in range(n)]
+    pasos.append("Matriz de cofactores:")
+    pasos.extend(formato_matriz(cofactores))
+    pasos.append("")
+    adj = transponer_matriz(cofactores)
+    pasos.append("Paso 3. adj(A) = transpuesta de la matriz de cofactores:")
+    pasos.extend(formato_matriz(adj))
+    pasos.append("")
+    pasos.append("Paso 4. A⁻¹ = (1/" + formato(det) + ")·adj(A):")
+    pasos.extend(formato_matriz(escalar_por_matriz(Fraction(1) / det, adj)))
+    return pasos
 
 
 def inversa_por_adjunta(A):
@@ -242,6 +336,12 @@ PROPIEDADES_INVERSA = (
     "det(A⁻¹) = 1/det(A)",
     "Operaciones de fila sobre det(A)",
     "Triangular: det = producto de la diagonal",
+    "det(Aᵀ) = det(A)",
+    "det(AB) = det(A)·det(B)",
+    "det(kA) = kⁿ·det(A)",
+    "Fila de ceros: det(A) = 0",
+    "Dos filas iguales: det(A) = 0",
+    "Criterio: det(A) ≠ 0  ⟺  A·A⁻¹ = I",
 )
 
 
@@ -328,23 +428,124 @@ def _prop_triangular(A, propiedad):
             "se_cumple": por_reduccion == por_cofactores}
 
 
+def _prop_det_transpuesta(A, propiedad):
+    """Propiedad 7: transponer no cambia el determinante."""
+    At = transponer_matriz(A)
+    izquierda, derecha = determinante(At), determinante(A)
+    return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
+            "derecha": derecha, "intermedios": [("Aᵀ", At)],
+            "se_cumple": izquierda == derecha}
+
+
+def _prop_det_producto(A, B, propiedad):
+    """Propiedad 8: el determinante de un producto es el producto de los
+    determinantes. Es la única propiedad del determinante que "respeta" la
+    multiplicación; con la suma no ocurre."""
+    if B is None:
+        raise ValueError("Esta propiedad necesita también la matriz B.")
+    validar_cuadrada(B)
+    AB = multiplicar_matrices(A, B)
+    izquierda = determinante(AB)
+    derecha = determinante(A) * determinante(B)
+    return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
+            "derecha": derecha, "intermedios": [("A·B", AB)],
+            "se_cumple": izquierda == derecha}
+
+
+def _prop_det_escalar(A, k, propiedad):
+    """Propiedad 9: det(kA) = k^n·det(A). El escalar sale elevado al tamaño
+    de la matriz, porque multiplica a las n filas, no solo a una."""
+    n = validar_cuadrada(A)
+    kA = escalar_por_matriz(k, A)
+    izquierda = determinante(kA)
+    derecha = (k ** n) * determinante(A)
+    return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
+            "derecha": derecha,
+            "intermedios": [("(" + formato(k) + ")·A", kA)],
+            "se_cumple": izquierda == derecha}
+
+
+def _prop_fila_de_ceros(A, fila_i, propiedad):
+    """Propiedad 10: una matriz con una fila de ceros tiene determinante 0,
+    porque esa fila no aporta ningún pivote."""
+    n = validar_cuadrada(A)
+    M = [fila[:] for fila in A]
+    M[fila_i] = [Fraction(0)] * n
+    izquierda = determinante(M)
+    return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
+            "derecha": Fraction(0),
+            "intermedios": [("A con la fila " + str(fila_i + 1)
+                             + " puesta en ceros", M)],
+            "se_cumple": izquierda == 0}
+
+
+def _prop_filas_iguales(A, fila_i, fila_j, propiedad):
+    """Propiedad 11: si dos filas son iguales el determinante es 0, porque
+    al restarlas queda una fila de ceros."""
+    validar_cuadrada(A)
+    if fila_i == fila_j:
+        raise ValueError("Para esta propiedad hay que elegir dos filas "
+                         "distintas en «Fila i» y «Fila j».")
+    M = [fila[:] for fila in A]
+    M[fila_i] = M[fila_j][:]
+    izquierda = determinante(M)
+    return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
+            "derecha": Fraction(0),
+            "intermedios": [("A con F" + str(fila_i + 1) + " copiada de F"
+                             + str(fila_j + 1), M)],
+            "se_cumple": izquierda == 0}
+
+
+def _prop_criterio_invertibilidad(A, propiedad):
+    """Propiedad 12: det(A) != 0 equivale a que A tenga inversa. Se comprueba
+    calculándola y verificando que A·A⁻¹ da la identidad."""
+    n = validar_cuadrada(A)
+    if determinante(A) == 0:
+        raise ValueError("det(A) = 0: la matriz es singular y no tiene "
+                         "inversa, que es justo lo que afirma el criterio.")
+    inv = inversa_gauss_jordan(A)
+    producto, se_cumple = comprobar_inversa(A, inv)
+    return {"propiedad": propiedad, "tipo": "matriz", "izquierda": producto,
+            "derecha": _identidad(n), "intermedios": [("A⁻¹", inv)],
+            "se_cumple": se_cumple}
+
+
+def _informe_operaciones_fila(A, fila_i, fila_j, k, propiedad):
+    """Arma el informe de los tres casos de operaciones de fila."""
+    if k is None:
+        raise ValueError("Falta el escalar k para esta propiedad.")
+    det, casos = _efecto_operaciones_fila(A, fila_i, fila_j, k)
+    return {"propiedad": propiedad, "tipo": "casos", "det": det,
+            "casos": casos,
+            "se_cumple": all(obt == esp for _, obt, esp in casos)}
+
+
+def _exigir_k(k):
+    """Devuelve k, o avisa si la casilla quedó vacía."""
+    if k is None:
+        raise ValueError("Falta el escalar k para esta propiedad.")
+    return k
+
+
 def verificar_propiedad_inversa(indice, A, B=None, fila_i=0, fila_j=1, k=None):
     """Verifica la propiedad número 'indice' (0 a 5) de PROPIEDADES_INVERSA.
     Devuelve un diccionario con los dos miembros, los pasos y si se cumple."""
     validar_cuadrada(A)
     propiedad = PROPIEDADES_INVERSA[indice]
 
-    if indice == 3:
-        return _prop_determinante_de_la_inversa(A, propiedad)
-    if indice == 4:
-        if k is None:
-            raise ValueError("Falta el escalar k para esta propiedad.")
-        det, casos = _efecto_operaciones_fila(A, fila_i, fila_j, k)
-        return {"propiedad": propiedad, "tipo": "casos", "det": det,
-                "casos": casos,
-                "se_cumple": all(obt == esp for _, obt, esp in casos)}
-    if indice == 5:
-        return _prop_triangular(A, propiedad)
+    informes = {
+        3: lambda: _prop_determinante_de_la_inversa(A, propiedad),
+        4: lambda: _informe_operaciones_fila(A, fila_i, fila_j, k, propiedad),
+        5: lambda: _prop_triangular(A, propiedad),
+        6: lambda: _prop_det_transpuesta(A, propiedad),
+        7: lambda: _prop_det_producto(A, B, propiedad),
+        8: lambda: _prop_det_escalar(A, _exigir_k(k), propiedad),
+        9: lambda: _prop_fila_de_ceros(A, fila_i, propiedad),
+        10: lambda: _prop_filas_iguales(A, fila_i, fila_j, propiedad),
+        11: lambda: _prop_criterio_invertibilidad(A, propiedad),
+    }
+    if indice in informes:
+        return informes[indice]()
 
     calculos = {0: lambda: _prop_inversa_de_la_inversa(A),
                 1: lambda: _prop_inversa_del_producto(A, B),
@@ -1074,11 +1275,13 @@ class MatricesOpsApp:
             lineas.append("Por reducción a triangular  : " + formato(por_reduccion)
                           + "   (" + str(intercambios) + " intercambio(s))")
             detalle = "\n".join(lineas) + "\n\n" + diagnostico_invertibilidad(A)
+            pasos = ["Matriz A:", *formato_matriz(A), "", *lineas, "",
+                     "=" * 58, "", *pasos_determinante(A), "", "=" * 58, ""]
+            if n == 3:
+                pasos += [*pasos_sarrus(A), "", "=" * 58, ""]
+            pasos += [*pasos_reduccion(A), "", diagnostico_invertibilidad(A)]
             self._mostrar_matriz("Forma triangular de A", triangular, detalle,
-                                 pasos=["DETERMINANTE DE A", "", *formato_matriz(A), "",
-                                        *lineas, "", "Forma triangular:",
-                                        *formato_matriz(triangular), "",
-                                        diagnostico_invertibilidad(A)])
+                                 pasos=pasos)
         except ValueError as e:
             self._mostrar_error(str(e))
 
@@ -1095,21 +1298,16 @@ class MatricesOpsApp:
         try:
             A = self._leer_A()
             validar_cuadrada(A)
-            pasos = ["INVERSA DE A", "", "Matriz A:", *formato_matriz(A), "",
-                     "det(A) = " + formato(determinante(A)), ""]
+            pasos = ["Matriz A:", *formato_matriz(A), ""]
             if metodo == "adjunta":
-                adj = matriz_adjunta(A)
-                pasos += ["adj(A) = transpuesta de la matriz de cofactores:",
-                          *formato_matriz(adj), "",
-                          "A⁻¹ = (1/det(A))·adj(A)", ""]
+                pasos += pasos_inversa_adjunta(A)
                 inversa = inversa_por_adjunta(A)
             else:
-                pasos += ["Se reduce [A | I] por filas hasta llegar a [I | A⁻¹].", ""]
+                pasos += pasos_inversa_gauss_jordan(A)
                 inversa = inversa_gauss_jordan(A)
             producto, se_cumple = comprobar_inversa(A, inversa)
-            pasos += ["A⁻¹:", *formato_matriz(inversa), "",
-                      "Comprobación A · A⁻¹:", *formato_matriz(producto), "",
-                      diagnostico_invertibilidad(A)]
+            pasos += ["", "Comprobación A · A⁻¹:", *formato_matriz(producto),
+                      "", diagnostico_invertibilidad(A)]
             detalle = (("A · A⁻¹ = I : la inversa es correcta."
                         if se_cumple else "A · A⁻¹ no dio la identidad.")
                        + "\n\n" + diagnostico_invertibilidad(A))
@@ -1123,7 +1321,7 @@ class MatricesOpsApp:
             A = self._leer_A()
             indice = list(PROPIEDADES_INVERSA).index(self.var_prop_inv.get())
             B = None
-            if indice == 1:
+            if indice in (1, 7):
                 B = self._leer_matriz(self.celdas_B,
                                       self._leer_dimension(self.var_mb, 2),
                                       self._leer_dimension(self.var_nb, 2), "B")
@@ -1562,7 +1760,15 @@ def _consola_determinante_completo():
         print("   Por reducción a triangular  : " + formato(por_reduccion)
               + "   (" + str(intercambios) + " intercambio(s))")
         print()
-        mostrar_matriz(triangular, titulo="   FORMA TRIANGULAR:")
+        for linea in pasos_determinante(A):
+            print("   " + linea)
+        if n == 3:
+            print()
+            for linea in pasos_sarrus(A):
+                print("   " + linea)
+        print()
+        for linea in pasos_reduccion(A):
+            print("   " + linea)
         print()
         print("   " + diagnostico_invertibilidad(A))
     except ValueError as error:
@@ -1583,14 +1789,15 @@ def _consola_inversa(metodo):
         print()
         mostrar_matriz(A, titulo="   MATRIZ A:")
         print()
-        print("   det(A) = " + formato(determinante(A)))
-        print()
         if metodo == "adjunta":
-            mostrar_matriz(matriz_adjunta(A), titulo="   adj(A):")
-            print()
+            desarrollo = pasos_inversa_adjunta(A)
             inversa = inversa_por_adjunta(A)
         else:
+            desarrollo = pasos_inversa_gauss_jordan(A)
             inversa = inversa_gauss_jordan(A)
+        for linea in desarrollo:
+            print("   " + linea)
+        print()
         mostrar_matriz(inversa, titulo="   INVERSA A⁻¹:")
         print()
         producto, se_cumple = comprobar_inversa(A, inversa)

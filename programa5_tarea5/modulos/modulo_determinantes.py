@@ -38,8 +38,8 @@
 from fractions import Fraction
 
 from modulos import (
-    formato, _validar_matriz, _leer_dimensiones, LOGO_DETERMINANTES,
-    con_subindice, nombre_variable,
+    formato, formato_matriz, _validar_matriz, _leer_dimensiones,
+    LOGO_DETERMINANTES, con_subindice, nombre_variable,
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_matriz,
     leer_vector, mostrar_matriz, pausa, preguntar,
 )
@@ -110,30 +110,140 @@ def determinante(A):
     return total
 
 
+def _linea_con_mas_ceros(A, n):
+    """Devuelve (tipo, indice, ceros): la fila o columna con más ceros.
+    Es la que conviene para desarrollar por cofactores, porque cada cero
+    anula un término completo y ahorra calcular ese menor."""
+    mejor = ("fila", 0, -1)
+    for i in range(n):
+        ceros = sum(1 for v in A[i] if v == 0)
+        if ceros > mejor[2]:
+            mejor = ("fila", i, ceros)
+    for j in range(n):
+        ceros = sum(1 for i in range(n) if A[i][j] == 0)
+        if ceros > mejor[2]:
+            mejor = ("columna", j, ceros)
+    return mejor
+
+
+def _posicion_del_termino(tipo, indice, pos):
+    """Convierte la posición dentro de la línea elegida en el par (i, j)."""
+    if tipo == "fila":
+        return indice, pos
+    return pos, indice
+
+
+def _resolver_menor(menor, pasos):
+    """Escribe cómo se resolvió el menor y devuelve su determinante.
+    Los menores 3x3 se desarrollan por Sarrus, igual que en clase."""
+    valor = determinante(menor)
+    if len(menor) == 3:
+        pasos.append("      Se resuelve por Sarrus:")
+        pasos.extend("      " + linea for linea in
+                     pasos_sarrus(menor, encabezado=False, nombre="M"))
+    elif len(menor) == 2:
+        pasos.append("      det = (" + formato(menor[0][0]) + ")("
+                     + formato(menor[1][1]) + ") - (" + formato(menor[0][1])
+                     + ")(" + formato(menor[1][0]) + ") = " + formato(valor))
+    else:
+        pasos.append("      det = " + formato(valor))
+    return valor
+
+
+def _escribir_termino(A, tipo, indice, pos, pasos):
+    """Escribe un término del desarrollo y devuelve su aporte a la suma."""
+    i, j = _posicion_del_termino(tipo, indice, pos)
+    etiqueta = str(i + 1) + str(j + 1)
+    if A[i][j] == 0:
+        pasos.append("a" + etiqueta + " = 0  ->  el término se anula; no hace "
+                     "falta calcular ese menor")
+        pasos.append("")
+        return Fraction(0)
+    signo = 1 if (i + j) % 2 == 0 else -1
+    pasos.append("a" + etiqueta + " = " + formato(A[i][j]) + ",   signo "
+                 "(-1)^(" + str(i + 1) + "+" + str(j + 1) + ") = "
+                 + ("+1" if signo > 0 else "-1"))
+    pasos.append("   M" + etiqueta + " = se tacha la fila " + str(i + 1)
+                 + " y la columna " + str(j + 1) + ":")
+    pasos.extend("   " + linea for linea in formato_matriz(submatriz(A, i, j)))
+    valor = _resolver_menor(submatriz(A, i, j), pasos)
+    aporte = signo * A[i][j] * valor
+    pasos.append("   Término = (" + formato(A[i][j]) + ")·("
+                 + ("+1" if signo > 0 else "-1") + ")·(" + formato(valor)
+                 + ") = " + formato(aporte))
+    pasos.append("")
+    return aporte
+
+
 def pasos_determinante(A):
-    """Devuelve el desarrollo escrito del determinante, para mostrarlo."""
+    """Desarrollo completo del determinante por expansión de cofactores,
+    eligiendo la fila o columna con más ceros, como se hace en clase."""
     n = validar_cuadrada(A)
     A = [[Fraction(valor) for valor in fila] for fila in A]
-    pasos = ["Determinante por expansión de cofactores (primera fila):"]
     if n == 1:
-        pasos.append("   Matriz 1x1: det(A) = " + formato(A[0][0]))
-        return pasos
+        return ["Matriz 1x1: det(A) = " + formato(A[0][0])]
     if n == 2:
-        pasos.append("   Matriz 2x2: det(A) = ad - bc")
-        pasos.append("   = (" + formato(A[0][0]) + ")(" + formato(A[1][1]) + ")"
-                     + " - (" + formato(A[0][1]) + ")(" + formato(A[1][0]) + ")"
-                     + " = " + formato(determinante(A)))
-        return pasos
-    terminos = []
-    for j in range(n):
-        signo = "+" if j % 2 == 0 else "-"
-        menor = determinante(submatriz(A, 0, j))
-        terminos.append("   " + signo + " (" + formato(A[0][j]) + ")·det(M1"
-                        + str(j + 1) + ")  con det(M1" + str(j + 1) + ") = "
-                        + formato(menor))
-    pasos.extend(terminos)
+        return ["Matriz 2x2: det(A) = ad - bc",
+                "   = (" + formato(A[0][0]) + ")(" + formato(A[1][1])
+                + ") - (" + formato(A[0][1]) + ")(" + formato(A[1][0])
+                + ") = " + formato(determinante(A))]
+
+    tipo, indice, ceros = _linea_con_mas_ceros(A, n)
+    pasos = ["DETERMINANTE POR EXPANSIÓN DE COFACTORES", "",
+             "Se desarrolla por la " + tipo + " " + str(indice + 1)
+             + ", que es la que tiene más ceros (" + str(ceros) + ").",
+             "Cada cero anula un término completo.", "",
+             "det(A) = suma de aij · (-1)^(i+j) · det(Mij) sobre esa "
+             + tipo, ""]
+    sumandos = [_escribir_termino(A, tipo, indice, pos, pasos)
+                for pos in range(n)]
+    pasos.append("Suma de los términos:")
+    pasos.append("   det(A) = " + " + ".join("(" + formato(v) + ")"
+                                             for v in sumandos))
     pasos.append("   det(A) = " + formato(determinante(A)))
     return pasos
+
+
+def pasos_sarrus(A, encabezado=True, nombre="A"):
+    """Desarrollo de la regla de Sarrus: las seis diagonales con sus
+    productos, la suma de cada grupo y la resta final.
+    Con encabezado=False omite el título, para incrustarlo dentro de otro
+    desarrollo (por ejemplo al resolver un menor 3x3)."""
+    validar_cuadrada(A)
+    A = [[Fraction(v) for v in fila] for fila in A]
+    bajan = [(A[0][0], A[1][1], A[2][2]), (A[0][1], A[1][2], A[2][0]),
+             (A[0][2], A[1][0], A[2][1])]
+    suben = [(A[0][2], A[1][1], A[2][0]), (A[0][0], A[1][2], A[2][1]),
+             (A[0][1], A[1][0], A[2][2])]
+    pasos = []
+    if encabezado:
+        pasos = ["REGLA DE SARRUS (solo matrices 3x3)", "",
+                 "Se repiten las dos primeras columnas a la derecha y se "
+                 "multiplican", "las tres diagonales que bajan (se suman) y "
+                 "las tres que suben (se restan).", ""]
+    pasos.append("Diagonales que BAJAN:")
+    total_bajan = _sumar_diagonales(bajan, pasos)
+    pasos.append("   Suma = " + formato(total_bajan))
+    pasos.append("")
+    pasos.append("Diagonales que SUBEN:")
+    total_suben = _sumar_diagonales(suben, pasos)
+    pasos.append("   Suma = " + formato(total_suben))
+    pasos.append("")
+    pasos.append("det(" + nombre + ") = " + formato(total_bajan) + " - ("
+                 + formato(total_suben) + ") = "
+                 + formato(total_bajan - total_suben))
+    return pasos
+
+
+def _sumar_diagonales(diagonales, pasos):
+    """Escribe el producto de cada diagonal y devuelve la suma de los tres."""
+    total = Fraction(0)
+    for x, y, z in diagonales:
+        producto = x * y * z
+        pasos.append("   (" + formato(x) + ")·(" + formato(y) + ")·("
+                     + formato(z) + ") = " + formato(producto))
+        total = total + producto
+    return total
 
 
 def determinante_sarrus(A):
@@ -154,22 +264,35 @@ def determinante_sarrus(A):
     return diagonales_bajan - diagonales_suben
 
 
-def _triangularizar(M, n):
+def _anotar(pasos, titulo, M):
+    """Agrega a la lista de pasos un título y la matriz tal como quedó.
+    Si pasos es None no hace nada, para poder reutilizar los algoritmos
+    cuando solo interesa el resultado."""
+    if pasos is None:
+        return
+    pasos.append(titulo)
+    pasos.extend(formato_matriz(M))
+    pasos.append("")
+
+
+def _triangularizar(M, n, pasos=None):
     """Lleva M a forma triangular superior usando intercambios y reemplazos.
-    Devuelve el número de intercambios, o None si una columna quedó en ceros."""
+    Devuelve el número de intercambios, o None si una columna quedó en ceros.
+    Si se le pasa una lista, va anotando cada operación y la matriz."""
     intercambios = 0
     for col in range(n):
-        fila = None
-        for f in range(col, n):
-            if M[f][col] != 0:
-                fila = f
-                break
+        fila = _buscar_pivote(M, col, n)
         # Columna entera de ceros: la diagonal queda con un 0 y det = 0.
         if fila is None:
+            if pasos is not None:
+                pasos.append("La columna " + str(col + 1) + " es toda ceros "
+                             "debajo de la diagonal: det(A) = 0.")
             return None
         if fila != col:
             M[col], M[fila] = M[fila], M[col]
             intercambios += 1          # cada intercambio cambia el signo
+            _anotar(pasos, "F" + str(col + 1) + " <-> F" + str(fila + 1)
+                    + "   (el determinante cambia de signo)", M)
 
         # Solo reemplazos Fi -> Fi - k·Fcol, que NO alteran el determinante.
         # Por eso no hace falta arrastrar ningún factor de corrección.
@@ -177,7 +300,47 @@ def _triangularizar(M, n):
             if M[f][col] != 0:
                 factor = M[f][col] / M[col][col]
                 M[f] = [M[f][j] - factor * M[col][j] for j in range(n)]
+                _anotar(pasos, "F" + str(f + 1) + " -> F" + str(f + 1) + " - ("
+                        + formato(factor) + ")·F" + str(col + 1)
+                        + "   (no altera el determinante)", M)
     return intercambios
+
+
+def _buscar_pivote(M, col, n):
+    """Primera fila, de col en adelante, con entrada distinta de cero en
+    esa columna. Devuelve None si la columna está llena de ceros."""
+    for f in range(col, n):
+        if M[f][col] != 0:
+            return f
+    return None
+
+
+def pasos_reduccion(A):
+    """Desarrollo completo del determinante por reducción a triangular:
+    cada operación de fila, la matriz que queda y el producto final."""
+    n = validar_cuadrada(A)
+    M = [[Fraction(v) for v in fila] for fila in A]
+    pasos = ["DETERMINANTE POR REDUCCIÓN A FORMA TRIANGULAR", "",
+             "Solo se usan intercambios y reemplazos. El reemplazo no cambia",
+             "el determinante; cada intercambio le cambia el signo.", ""]
+    _anotar(pasos, "Matriz de partida:", M)
+    intercambios = _triangularizar(M, n, pasos)
+    if intercambios is None:
+        pasos.append("det(A) = 0")
+        return pasos
+    diagonal = [M[i][i] for i in range(n)]
+    producto = Fraction(1)
+    for v in diagonal:
+        producto = producto * v
+    pasos.append("Producto de la diagonal: "
+                 + " · ".join(formato(v) for v in diagonal)
+                 + " = " + formato(producto))
+    pasos.append("Intercambios realizados: " + str(intercambios)
+                 + "  ->  signo (-1)^" + str(intercambios) + " = "
+                 + ("-1" if intercambios % 2 else "+1"))
+    pasos.append("det(A) = " + formato(-producto if intercambios % 2
+                                       else producto))
+    return pasos
 
 
 def determinante_por_reduccion(A):
