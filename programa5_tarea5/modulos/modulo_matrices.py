@@ -1376,28 +1376,33 @@ class MatricesOpsApp:
         except (ValueError, IndexError) as e:
             self._mostrar_error(str(e))
 
+    def _texto_casos(self, res):
+        """Arma el texto de una verificación de tipo «casos»: el determinante
+        y, por cada operación de fila, el valor obtenido y el esperado."""
+        lineas = ["det(A) = " + formato(res["det"])]
+        for nombre, obtenido, esperado in res["casos"]:
+            lineas += ["", nombre, "   obtenido: " + formato(obtenido)
+                       + "    esperado: " + formato(esperado)]
+        return "\n".join(lineas)
+
     def _mostrar_informe_inversa(self, res):
-        """Arma el texto del resultado de una verificación y lo muestra."""
+        """Muestra el resultado de una verificación en el panel de resultado,
+        sea el resultado una matriz, un número o una lista de casos."""
         conclusion = ("Conclusión: se cumple " + res["propiedad"] + "."
                       if res["se_cumple"] else
                       "Conclusión: los miembros no coinciden; revisa los datos.")
-        if res["tipo"] == "casos":
-            lineas = ["det(A) = " + formato(res["det"]), ""]
-            for nombre, obtenido, esperado in res["casos"]:
-                lineas += [nombre, "   obtenido: " + formato(obtenido)
-                           + "    esperado: " + formato(esperado)]
-            self._mostrar_aviso("\n".join(lineas) + "\n\n" + conclusion)
-            return
         pasos = ["VERIFICACIÓN DE: " + res["propiedad"], ""]
         for titulo, M in res.get("intermedios", []):
             pasos += [titulo + ":", *formato_matriz(M), ""]
-        if res["tipo"] == "escalar":
-            detalle = ("Lado izquierdo : " + formato(res["izquierda"])
-                       + "\nLado derecho   : " + formato(res["derecha"])
-                       + "\n\n" + conclusion)
-            pasos += [detalle]
-            self._mostrar_aviso(detalle)
+
+        if res["tipo"] in ("casos", "escalar"):
+            cuerpo = (self._texto_casos(res) if res["tipo"] == "casos"
+                      else "Lado izquierdo : " + formato(res["izquierda"])
+                      + "\nLado derecho   : " + formato(res["derecha"]))
+            pasos += cuerpo.split("\n") + ["", conclusion]
+            self._mostrar_valor(res["propiedad"], cuerpo, conclusion, pasos)
             return
+
         pasos += ["LADO IZQUIERDO:", *formato_matriz(res["izquierda"]), "",
                   "LADO DERECHO:", *formato_matriz(res["derecha"]), "", conclusion]
         self._mostrar_matriz("Lado izquierdo de " + res["propiedad"],
@@ -1624,7 +1629,8 @@ class MatricesOpsApp:
                  fg=color, anchor="w").pack(fill="x", padx=2, pady=(6, 2))
         return sub
 
-    def _mostrar_matriz(self, titulo, C, detalle="", pasos=None):
+    def _limpiar_panel(self):
+        """Vacía el panel de resultado y lo deja listo para escribir."""
         for hijo in self.frame_resultado.winfo_children():
             hijo.destroy()
         if self.aviso_vacio is not None:
@@ -1637,11 +1643,43 @@ class MatricesOpsApp:
         self.procedimiento_visible = False
         self.sub_procedimiento = None
 
+    def _cartel_resultado(self, titulo):
+        """Dibuja la tarjeta RESULTADO con su cartel azul y la devuelve."""
         sub = self._sub_tarjeta("RESULTADO", ACENTO)
         cartel = tk.Frame(sub, bg=ACENTO, padx=14, pady=10)
         cartel.pack(fill="x", pady=(0, 6))
-        self._texto_ajustable(tk.Label(cartel, text=titulo, font=self.fuente_big,
-                                       bg=ACENTO, fg=FONDO)).pack(fill="x")
+        self._texto_ajustable(tk.Label(cartel, text=titulo,
+                                       font=self.fuente_big, bg=ACENTO,
+                                       fg=FONDO)).pack(fill="x")
+        return sub
+
+    def _detalle_resultado(self, sub, detalle):
+        """Agrega el texto explicativo bajo el resultado, si lo hay."""
+        if not detalle:
+            return
+        self._texto_ajustable(tk.Label(sub, text=detalle,
+                                       font=self.fuente_body, bg=TARJETA,
+                                       fg=TEXTO_SUAVE, justify="left",
+                                       anchor="w", wraplength=480)
+                              ).pack(fill="x", pady=(0, 8))
+
+    def _cerrar_panel(self, titulo, C, pasos):
+        """Guarda el último resultado y prepara el botón de procedimiento."""
+        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos,
+                                 "procedimiento_titulo": "DESARROLLO PASO A PASO"}
+        self.boton_procedimiento.configure(text="Ver procedimiento")
+        if pasos:
+            self.boton_procedimiento.pack(side="right")
+        else:
+            self.boton_procedimiento.pack_forget()
+        self.lienzo_resultado.yview_moveto(0)
+        self.raiz.update_idletasks()
+        self._ajustar_textos()
+
+    def _mostrar_matriz(self, titulo, C, detalle="", pasos=None):
+        """Muestra una matriz en el panel de resultado."""
+        self._limpiar_panel()
+        sub = self._cartel_resultado(titulo)
         filas = _leer_dimensiones(C)
         self._texto_ajustable(tk.Label(sub, text="Matriz resultante de tamaño "
                                        + str(filas[0]) + "×" + str(filas[1]),
@@ -1650,23 +1688,20 @@ class MatricesOpsApp:
         self._texto_ajustable(tk.Label(sub, text="\n".join(formato_matriz(C)),
                                        font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
                                        justify="left", anchor="w")).pack(fill="x", pady=(0, 6))
-        if detalle:
-            self._texto_ajustable(tk.Label(sub, text=detalle, font=self.fuente_body,
-                                           bg=TARJETA, fg=TEXTO_SUAVE, justify="left",
-                                           anchor="w", wraplength=480)).pack(fill="x",
-                                                                             pady=(0, 8))
+        self._detalle_resultado(sub, detalle)
+        self._cerrar_panel(titulo, C, pasos)
 
-        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos,
-                                 "procedimiento_titulo": "DESARROLLO PASO A PASO"}
-        self.boton_procedimiento.configure(text="Ver procedimiento")
-        if pasos:
-            self.boton_procedimiento.pack(side="right")
-        else:
-            self.boton_procedimiento.pack_forget()
-
-        self.lienzo_resultado.yview_moveto(0)
-        self.raiz.update_idletasks()
-        self._ajustar_textos()
+    def _mostrar_valor(self, titulo, cuerpo, detalle="", pasos=None):
+        """Muestra en el panel algo que no es una matriz: un número, una
+        comparación de dos lados o una lista de casos. Usa la misma tarjeta
+        que _mostrar_matriz para que todas las respuestas se vean igual."""
+        self._limpiar_panel()
+        sub = self._cartel_resultado(titulo)
+        self._texto_ajustable(tk.Label(sub, text=cuerpo, font=self.fuente_mono,
+                                       bg=TARJETA, fg=TEXTO, justify="left",
+                                       anchor="w")).pack(fill="x", pady=(0, 6))
+        self._detalle_resultado(sub, detalle)
+        self._cerrar_panel(titulo, None, pasos)
 
     def _alternar_procedimiento(self):
         if not self.ultimo_resultado or not self.ultimo_resultado.get("pasos"):
@@ -1701,13 +1736,6 @@ class MatricesOpsApp:
 
     def _mostrar_error(self, mensaje):
         messagebox.showerror("Operación no válida", mensaje)
-
-    def _mostrar_aviso(self, mensaje):
-        """Muestra un resultado correcto (no un error) en una ventana aparte.
-        Se usa cuando la verificación no devuelve una matriz que pintar en el
-        panel de resultados, sino números o una lista de casos."""
-        messagebox.showinfo("Verificación de propiedad", mensaje)
-
 
     def _ver_teoremas(self):
         """Opción '0. Ver Teoremas Clave del Módulo' que pide la Tarea 4.
