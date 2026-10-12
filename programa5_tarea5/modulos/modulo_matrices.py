@@ -303,12 +303,16 @@ def inversa_por_adjunta(A):
 
 
 def comprobar_inversa(A, inversa):
-    """Comprueba A·A⁻¹ = I con la propia función de producto del módulo.
-    Devuelve (producto, se_cumple)."""
-    n = len(A)
-    producto = multiplicar_matrices(A, inversa)
+    """Comprueba la definición completa de inversa: A·A⁻¹ = I y A⁻¹·A = I.
+    Devuelve (A·A⁻¹, A⁻¹·A, se_cumple). Se calculan los dos productos
+    porque la definición exige ambos; el producto de matrices no es
+    conmutativo, así que mostrar uno solo no probaría la definición."""
+    identidad = _identidad(len(A))
+    por_derecha = multiplicar_matrices(A, inversa)
+    por_izquierda = multiplicar_matrices(inversa, A)
     # La comparación es exacta porque todo se calcula con Fraction, no con float.
-    return producto, producto == _identidad(n)
+    return por_derecha, por_izquierda, (por_derecha == identidad
+                                        and por_izquierda == identidad)
 
 
 def diagnostico_invertibilidad(A):
@@ -341,7 +345,7 @@ PROPIEDADES_INVERSA = (
     "det(kA) = kⁿ·det(A)",
     "Fila de ceros: det(A) = 0",
     "Dos filas iguales: det(A) = 0",
-    "Criterio: det(A) ≠ 0  ⟺  A·A⁻¹ = I",
+    "A⁻¹·A = I  y  A·A⁻¹ = I",
 )
 
 
@@ -496,18 +500,22 @@ def _prop_filas_iguales(A, fila_i, fila_j, propiedad):
             "se_cumple": izquierda == 0}
 
 
-def _prop_criterio_invertibilidad(A, propiedad):
-    """Propiedad 12: det(A) != 0 equivale a que A tenga inversa. Se comprueba
-    calculándola y verificando que A·A⁻¹ da la identidad."""
+def _prop_definicion_de_inversa(A, propiedad):
+    """Propiedad 12: la definición de matriz inversa. A⁻¹ es la matriz que
+    cumple A⁻¹·A = I y además A·A⁻¹ = I. Se calculan los dos productos
+    porque el producto de matrices no es conmutativo."""
     n = validar_cuadrada(A)
     if determinante(A) == 0:
         raise ValueError("det(A) = 0: la matriz es singular y no tiene "
-                         "inversa, que es justo lo que afirma el criterio.")
+                         "inversa, así que esta propiedad no se le aplica.")
     inv = inversa_gauss_jordan(A)
-    producto, se_cumple = comprobar_inversa(A, inv)
-    return {"propiedad": propiedad, "tipo": "matriz", "izquierda": producto,
-            "derecha": _identidad(n), "intermedios": [("A⁻¹", inv)],
-            "se_cumple": se_cumple}
+    por_derecha, por_izquierda, _ = comprobar_inversa(A, inv)
+    return {"propiedad": propiedad, "tipo": "matriz",
+            "izquierda": por_izquierda, "derecha": _identidad(n),
+            "intermedios": [("A⁻¹", inv), ("A·A⁻¹ (el otro orden)",
+                                           por_derecha)],
+            "se_cumple": por_izquierda == _identidad(n)
+            and por_derecha == _identidad(n)}
 
 
 def _informe_operaciones_fila(A, fila_i, fila_j, k, propiedad):
@@ -542,7 +550,7 @@ def verificar_propiedad_inversa(indice, A, B=None, fila_i=0, fila_j=1, k=None):
         8: lambda: _prop_det_escalar(A, _exigir_k(k), propiedad),
         9: lambda: _prop_fila_de_ceros(A, fila_i, propiedad),
         10: lambda: _prop_filas_iguales(A, fila_i, fila_j, propiedad),
-        11: lambda: _prop_criterio_invertibilidad(A, propiedad),
+        11: lambda: _prop_definicion_de_inversa(A, propiedad),
     }
     if indice in informes:
         return informes[indice]()
@@ -1305,12 +1313,14 @@ class MatricesOpsApp:
             else:
                 pasos += pasos_inversa_gauss_jordan(A)
                 inversa = inversa_gauss_jordan(A)
-            producto, se_cumple = comprobar_inversa(A, inversa)
-            pasos += ["", "Comprobación A · A⁻¹:", *formato_matriz(producto),
-                      "", diagnostico_invertibilidad(A)]
-            detalle = (("A · A⁻¹ = I : la inversa es correcta."
-                        if se_cumple else "A · A⁻¹ no dio la identidad.")
-                       + "\n\n" + diagnostico_invertibilidad(A))
+            derecha, izquierda, se_cumple = comprobar_inversa(A, inversa)
+            pasos += ["", "Comprobación de la definición (los dos órdenes):",
+                      "", "A⁻¹ · A:", *formato_matriz(izquierda), "",
+                      "A · A⁻¹:", *formato_matriz(derecha), "",
+                      diagnostico_invertibilidad(A)]
+            detalle = (("A⁻¹·A = I  y  A·A⁻¹ = I : la inversa es correcta."
+                        if se_cumple else "Los productos no dieron la "
+                        "identidad.") + "\n\n" + diagnostico_invertibilidad(A))
             self._mostrar_matriz("A⁻¹ por " + metodo, inversa, detalle, pasos=pasos)
         except ValueError as e:
             self._mostrar_error(str(e))
@@ -1800,11 +1810,14 @@ def _consola_inversa(metodo):
         print()
         mostrar_matriz(inversa, titulo="   INVERSA A⁻¹:")
         print()
-        producto, se_cumple = comprobar_inversa(A, inversa)
-        mostrar_matriz(producto, titulo="   COMPROBACIÓN A · A⁻¹:")
+        derecha, izquierda, se_cumple = comprobar_inversa(A, inversa)
+        mostrar_matriz(izquierda, titulo="   COMPROBACIÓN A⁻¹ · A:")
         print()
-        print("   " + ("A · A⁻¹ = I : la inversa es correcta." if se_cumple
-                       else "A · A⁻¹ no dio la identidad."))
+        mostrar_matriz(derecha, titulo="   COMPROBACIÓN A · A⁻¹:")
+        print()
+        print("   " + ("A⁻¹·A = I  y  A·A⁻¹ = I : la inversa es correcta."
+                       if se_cumple else "Los productos no dieron la "
+                       "identidad."))
         print("   " + diagnostico_invertibilidad(A))
     except ValueError as error:
         print("\n   " + str(error))
