@@ -333,19 +333,25 @@ def diagnostico_invertibilidad(A):
 # compara. Reutiliza las funciones del módulo, sin repetir cálculos.
 # =====================================================================
 
+# El desplegable va agrupado por tema: primero las propiedades de la
+# INVERSA, después las del DETERMINANTE, y al final las que dependen de la
+# FORMA de la matriz (operaciones de fila, triangular, filas especiales).
 PROPIEDADES_INVERSA = (
+    # Inversa
     "(A⁻¹)⁻¹ = A",
     "(AB)⁻¹ = B⁻¹A⁻¹",
     "(Aᵀ)⁻¹ = (A⁻¹)ᵀ",
+    "A⁻¹·A = I  y  A·A⁻¹ = I",
+    # Determinante
     "det(A⁻¹) = 1/det(A)",
-    "Operaciones de fila sobre det(A)",
-    "Triangular: det = producto de la diagonal",
     "det(Aᵀ) = det(A)",
     "det(AB) = det(A)·det(B)",
     "det(kA) = kⁿ·det(A)",
+    # Forma de la matriz
+    "Operaciones de fila sobre det(A)",
+    "Triangular: det = producto de la diagonal",
     "Fila de ceros: det(A) = 0",
     "Dos filas iguales: det(A) = 0",
-    "A⁻¹·A = I  y  A·A⁻¹ = I",
 )
 
 
@@ -535,33 +541,58 @@ def _exigir_k(k):
     return k
 
 
-def verificar_propiedad_inversa(indice, A, B=None, fila_i=0, fila_j=1, k=None):
-    """Verifica la propiedad número 'indice' (0 a 5) de PROPIEDADES_INVERSA.
-    Devuelve un diccionario con los dos miembros, los pasos y si se cumple."""
-    validar_cuadrada(A)
-    propiedad = PROPIEDADES_INVERSA[indice]
-
-    informes = {
-        3: lambda: _prop_determinante_de_la_inversa(A, propiedad),
-        4: lambda: _informe_operaciones_fila(A, fila_i, fila_j, k, propiedad),
-        5: lambda: _prop_triangular(A, propiedad),
-        6: lambda: _prop_det_transpuesta(A, propiedad),
-        7: lambda: _prop_det_producto(A, B, propiedad),
-        8: lambda: _prop_det_escalar(A, _exigir_k(k), propiedad),
-        9: lambda: _prop_fila_de_ceros(A, fila_i, propiedad),
-        10: lambda: _prop_filas_iguales(A, fila_i, fila_j, propiedad),
-        11: lambda: _prop_definicion_de_inversa(A, propiedad),
-    }
-    if indice in informes:
-        return informes[indice]()
-
-    calculos = {0: lambda: _prop_inversa_de_la_inversa(A),
-                1: lambda: _prop_inversa_del_producto(A, B),
-                2: lambda: _prop_inversa_de_la_transpuesta(A)}
-    izquierda, derecha, intermedios = calculos[indice]()
+def _informe_matriz(calculo, propiedad):
+    """Arma el informe de una propiedad cuyos dos miembros son matrices."""
+    izquierda, derecha, intermedios = calculo()
     return {"propiedad": propiedad, "tipo": "matriz", "izquierda": izquierda,
             "derecha": derecha, "intermedios": intermedios,
             "se_cumple": izquierda == derecha}
+
+
+# Cada propiedad se despacha por su NOMBRE, no por su número de orden, para
+# que reordenar el desplegable no obligue a tocar nada más.
+_VERIFICADORES = {
+    "(A⁻¹)⁻¹ = A":
+        lambda A, B, i, j, k, p: _informe_matriz(
+            lambda: _prop_inversa_de_la_inversa(A), p),
+    "(AB)⁻¹ = B⁻¹A⁻¹":
+        lambda A, B, i, j, k, p: _informe_matriz(
+            lambda: _prop_inversa_del_producto(A, B), p),
+    "(Aᵀ)⁻¹ = (A⁻¹)ᵀ":
+        lambda A, B, i, j, k, p: _informe_matriz(
+            lambda: _prop_inversa_de_la_transpuesta(A), p),
+    "A⁻¹·A = I  y  A·A⁻¹ = I":
+        lambda A, B, i, j, k, p: _prop_definicion_de_inversa(A, p),
+    "det(A⁻¹) = 1/det(A)":
+        lambda A, B, i, j, k, p: _prop_determinante_de_la_inversa(A, p),
+    "det(Aᵀ) = det(A)":
+        lambda A, B, i, j, k, p: _prop_det_transpuesta(A, p),
+    "det(AB) = det(A)·det(B)":
+        lambda A, B, i, j, k, p: _prop_det_producto(A, B, p),
+    "det(kA) = kⁿ·det(A)":
+        lambda A, B, i, j, k, p: _prop_det_escalar(A, _exigir_k(k), p),
+    "Operaciones de fila sobre det(A)":
+        lambda A, B, i, j, k, p: _informe_operaciones_fila(A, i, j, k, p),
+    "Triangular: det = producto de la diagonal":
+        lambda A, B, i, j, k, p: _prop_triangular(A, p),
+    "Fila de ceros: det(A) = 0":
+        lambda A, B, i, j, k, p: _prop_fila_de_ceros(A, i, p),
+    "Dos filas iguales: det(A) = 0":
+        lambda A, B, i, j, k, p: _prop_filas_iguales(A, i, j, p),
+}
+
+
+def verificar_propiedad_inversa(indice, A, B=None, fila_i=0, fila_j=1, k=None):
+    """Verifica la propiedad número 'indice' de PROPIEDADES_INVERSA.
+    Devuelve un diccionario con los dos miembros, los pasos y si se cumple."""
+    validar_cuadrada(A)
+    propiedad = PROPIEDADES_INVERSA[indice]
+    return _VERIFICADORES[propiedad](A, B, fila_i, fila_j, k, propiedad)
+
+
+def necesita_matriz_b(propiedad):
+    """Dice si la propiedad elegida usa también la matriz B."""
+    return propiedad in ("(AB)⁻¹ = B⁻¹A⁻¹", "det(AB) = det(A)·det(B)")
 
 
 PROPIEDADES_TRANSPUESTA = (
@@ -1329,9 +1360,10 @@ class MatricesOpsApp:
         """Verifica la propiedad elegida del desplegable de la inversa."""
         try:
             A = self._leer_A()
-            indice = list(PROPIEDADES_INVERSA).index(self.var_prop_inv.get())
+            propiedad = self.var_prop_inv.get()
+            indice = list(PROPIEDADES_INVERSA).index(propiedad)
             B = None
-            if indice in (1, 7):
+            if necesita_matriz_b(propiedad):
                 B = self._leer_matriz(self.celdas_B,
                                       self._leer_dimension(self.var_mb, 2),
                                       self._leer_dimension(self.var_nb, 2), "B")
@@ -1832,14 +1864,14 @@ def _menu_verificador():
         print()
         print("   Inversa y determinante (Sesiones 10 y 11):")
         for i, prop in enumerate(PROPIEDADES_INVERSA, start=1):
-            print("   " + str(i) + ". " + prop)
+            print("   " + str(i).rjust(2) + ". " + prop)
         print()
         print("   Transpuesta (Sesión 9):")
-        print("   7. Las cuatro propiedades de la transpuesta")
+        print("    T. Las cuatro propiedades de la transpuesta")
         print()
         print("   Linealidad de Ax (Sesión 6):")
-        print("   8. A(u + v) = Au + Av")
-        print("   9. A(cu) = c(Au)")
+        print("    S. A(u + v) = Au + Av      (suma)")
+        print("    E. A(cu) = c(Au)           (escalar)")
         print()
         print("   V. Volver")
         print()
@@ -1847,28 +1879,37 @@ def _menu_verificador():
 
         if opcion == "V":
             return
-        elif opcion in ("1", "2", "3", "4", "5", "6"):
+        elif opcion.isdigit() and 1 <= int(opcion) <= len(PROPIEDADES_INVERSA):
             _consola_propiedad_inversa(int(opcion) - 1)
-        elif opcion == "7":
+        elif opcion == "T":
             _menu_propiedades_transpuesta()
-        elif opcion in ("8", "9"):
-            _consola_propiedad(opcion == "8")
+        elif opcion in ("S", "E"):
+            _consola_propiedad(opcion == "S")
         else:
             print("   Opción no válida.")
             pausa()
 
 
+# Qué datos extra pide cada propiedad, además de la matriz A.
+_PIDEN_FILAS = ("Operaciones de fila sobre det(A)", "Fila de ceros: det(A) = 0",
+                "Dos filas iguales: det(A) = 0")
+_PIDEN_ESCALAR = ("Operaciones de fila sobre det(A)", "det(kA) = kⁿ·det(A)")
+
+
 def _pedir_datos_propiedad(indice):
-    """Pide la matriz A y, según la propiedad, también B o los datos de fila."""
+    """Pide la matriz A y, según la propiedad, también B, las filas o k."""
+    propiedad = PROPIEDADES_INVERSA[indice]
     A = _pedir_matriz("A")
     B = None
     fila_i, fila_j, k = 0, 1, None
-    if indice == 1:                       # (AB)⁻¹ necesita una segunda matriz
+    if necesita_matriz_b(propiedad):
         print()
         B = _pedir_matriz("B")
-    if indice == 4:                       # las operaciones de fila las elige el usuario
+    if propiedad in _PIDEN_FILAS:
         fila_i = leer_entero("   Fila i = ") - 1
-        fila_j = leer_entero("   Fila j = ") - 1
+        if propiedad != "Fila de ceros: det(A) = 0":
+            fila_j = leer_entero("   Fila j = ") - 1
+    if propiedad in _PIDEN_ESCALAR:
         k = leer_numero("   Escalar k = ")
     return A, B, fila_i, fila_j, k
 
@@ -1896,7 +1937,7 @@ def _mostrar_informe_propiedad(res):
 
 
 def _consola_propiedad_inversa(indice):
-    """Verifica una de las seis propiedades de las Sesiones 10 y 11."""
+    """Verifica una de las propiedades de las Sesiones 10 y 11."""
     mostrar_cabecera(LOGO_MATRICES)
     print("   VERIFICAR:  " + PROPIEDADES_INVERSA[indice])
     print()
