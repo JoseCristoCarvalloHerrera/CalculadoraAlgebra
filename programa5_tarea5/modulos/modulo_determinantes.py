@@ -39,7 +39,7 @@ from fractions import Fraction
 
 from modulos import (
     formato, formato_matriz, _validar_matriz, _leer_dimensiones,
-    LOGO_DETERMINANTES, con_subindice, nombre_variable,
+    LOGO_DETERMINANTES, con_subindice, con_exponente, nombre_variable,
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_matriz,
     leer_vector, mostrar_matriz, pausa, preguntar,
 )
@@ -160,8 +160,8 @@ def _escribir_termino(A, tipo, indice, pos, pasos):
         pasos.append("")
         return Fraction(0)
     signo = 1 if (i + j) % 2 == 0 else -1
-    pasos.append("a" + etiqueta + " = " + formato(A[i][j]) + ",   signo "
-                 "(-1)^(" + str(i + 1) + "+" + str(j + 1) + ") = "
+    pasos.append("a" + etiqueta + " = " + formato(A[i][j]) + ",   signo (-1)"
+                 + con_exponente(i + j + 2) + " = "
                  + ("+1" if signo > 0 else "-1"))
     pasos.append("   M" + etiqueta + " = se tacha la fila " + str(i + 1)
                  + " y la columna " + str(j + 1) + ":")
@@ -193,7 +193,7 @@ def pasos_determinante(A):
              "Se desarrolla por la " + tipo + " " + str(indice + 1)
              + ", que es la que tiene más ceros (" + str(ceros) + ").",
              "Cada cero anula un término completo.", "",
-             "det(A) = suma de aij · (-1)^(i+j) · det(Mij) sobre esa "
+             "det(A) = suma de aij · (-1)ⁱ⁺ʲ · det(Mij) sobre esa "
              + tipo, ""]
     sumandos = [_escribir_termino(A, tipo, indice, pos, pasos)
                 for pos in range(n)]

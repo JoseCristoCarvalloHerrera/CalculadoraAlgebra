@@ -130,6 +130,15 @@ def con_subindice(nombre):
     return nombre
 
 
+# Para escribir los signos (-1)^(i+j) con el exponente pequeño, como en clase.
+_TABLA_EXPONENTES = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+
+
+def con_exponente(numero):
+    """Escribe un número entero como exponente pequeño: 2 -> ²."""
+    return str(numero).translate(_TABLA_EXPONENTES)
+
+
 def nombre_variable(indice_base_uno):
     """Nombre de columna para mostrar en la interfaz, ya con su
     subíndice pequeño: nombre_variable(1) -> 'x₁'."""

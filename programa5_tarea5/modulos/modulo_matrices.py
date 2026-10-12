@@ -26,7 +26,7 @@ from modulos import (
     FONDO, TARJETA, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
     BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, EXITO, ADVERTENCIA, ERROR,
     LETRA_MONO, MAX_DIMENSION, AYUDA_NUMERO,
-    a_numero, formato, formato_matriz, con_subindice,
+    a_numero, formato, formato_matriz, con_subindice, con_exponente,
     _es_matriz_valida, _validar_matriz, _leer_dimensiones, LOGO_MATRICES,
     mostrar_cabecera, limpiar_pantalla, leer_entero, leer_numero,
     leer_vector, leer_matriz, mostrar_matriz, pausa, preguntar,
@@ -245,19 +245,21 @@ def matriz_adjunta(A):
 
 
 def pasos_cofactor(A, i, j, pasos):
-    """Agrega al desarrollo el cofactor Cij: el menor que queda al tachar la
-    fila i y la columna j, su determinante y el signo que le corresponde."""
+    """Escribe el cofactor Cij con el mismo formato que los ejemplos de
+    clase:  Cij = (-1)^(i+j)·det[menor] = valor.
+    El menor se dibuja a la derecha del signo y el resultado al final."""
     menor = submatriz(A, i, j)
     signo = 1 if (i + j) % 2 == 0 else -1
-    etiqueta = str(i + 1) + str(j + 1)
-    pasos.append("C" + etiqueta + ":  se tacha la fila " + str(i + 1)
-                 + " y la columna " + str(j + 1) + ",  signo (-1)^("
-                 + str(i + 1) + "+" + str(j + 1) + ") = "
-                 + ("+1" if signo > 0 else "-1"))
-    pasos.extend("   " + linea for linea in formato_matriz(menor))
-    valor = signo * determinante(menor)
-    pasos.append("   det(M" + etiqueta + ") = " + formato(determinante(menor))
-                 + "   ->   C" + etiqueta + " = " + formato(valor))
+    det_menor = determinante(menor)
+    valor = signo * det_menor
+    cabecera = (con_subindice("C" + str(i + 1) + str(j + 1)) + " = (-1)"
+                + con_exponente(i + j + 2) + "·det ")
+    filas = formato_matriz(menor, sangria="")
+    pasos.append(cabecera + filas[0] + "  =  ("
+                 + ("+1" if signo > 0 else "-1") + ")·(" + formato(det_menor)
+                 + ")  =  " + formato(valor))
+    for fila in filas[1:]:
+        pasos.append(" " * len(cabecera) + fila)
     pasos.append("")
     return valor
 
