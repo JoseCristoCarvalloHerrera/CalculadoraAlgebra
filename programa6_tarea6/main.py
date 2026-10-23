@@ -55,6 +55,7 @@ from modulos.modulo_determinantes import (
 )
 from modulos.modulo_lu import (
     LUApp, factorizar_lu, verificar_factorizacion, resolver_lu, MENSAJE_SIN_PERMUTACION,
+    pasos_comprobar_factorizacion, pasos_comprobar_solucion,
 )
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
 from modulos import modulo_sistemas, modulo_vectores, modulo_matrices, modulo_determinantes, modulo_lu
@@ -626,9 +627,47 @@ def ejecutar_pruebas():
     A_rect_lu = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
     L_r, U_r, _ = factorizar_lu(A_rect_lu)
     _, ok_r = verificar_factorizacion(A_rect_lu, L_r, U_r)
-    probar("L·U == A con A rectangular 2x3",
+    probar("L·U == A con A rectngular 2x3",
            ok_r and len(L_r) == 2 and len(L_r[0]) == 2
            and len(U_r) == 2 and len(U_r[0]) == 3)
+
+    # El botón «Ver L·U = A» desarrolla cada entrada y la compara con A.
+    texto_lu = "\n".join(pasos_comprobar_factorizacion(A_lu, L_lu, U_lu))
+    probar("Comprobación L·U muestra las cuentas fila-columna",
+           "(L·U)[1][1] = (1)·(2) + (0)·(0) + (0)·(0) = 2 + 0 + 0 = 2"
+           in texto_lu
+           and texto_lu.count("✓") == 9
+           and "La factorización es correcta (L · U == A)." in texto_lu,
+           f"texto={texto_lu[:120]}...")
+
+    texto_rect = "\n".join(pasos_comprobar_factorizacion(A_rect_lu, L_r, U_r))
+    probar("Comprobación L·U en rectangular 2x3 (6 entradas)",
+           texto_rect.count("✓") == 6
+           and "La factorización es correcta (L · U == A)." in texto_rect)
+
+    # Una U alterada debe delatarse: la comprobación no es decorativa.
+    U_mala = [list(fila) for fila in U_lu]
+    U_mala[0][0] = U_mala[0][0] + 1
+    texto_malo = "\n".join(pasos_comprobar_factorizacion(A_lu, L_lu, U_mala))
+    probar("La comprobación detecta una L·U incorrecta",
+           "✗" in texto_malo
+           and "¡Atención! L · U no coincide con A." in texto_malo)
+
+    # El botón «Ver A·x = b» desarrolla el producto matriz-vector.
+    texto_ax = "\n".join(pasos_comprobar_solucion(
+        A_lu, datos_lu["x"], [fr(8), fr(-11), fr(-3)]))
+    probar("Comprobación A·x muestra la regla fila-vector",
+           "(A·x)[1] = (2)·(2) + (1)·(3) + (-1)·(-1) = 4 + 3 + 1 = 8"
+           in texto_ax
+           and texto_ax.count("✓") == 3
+           and texto_ax.strip().endswith("Comprobación exitosa: A · x == b"),
+           f"texto={texto_ax[:120]}...")
+
+    texto_ax_malo = "\n".join(pasos_comprobar_solucion(
+        A_lu, [fr(0), fr(0), fr(0)], [fr(8), fr(-11), fr(-3)]))
+    probar("La comprobación detecta un A·x incorrecto",
+           "✗" in texto_ax_malo
+           and "¡Atención! A · x no coincide con b" in texto_ax_malo)
 
     # Pivote diagonal cero que exigiría intercambio de filas.
     try:
