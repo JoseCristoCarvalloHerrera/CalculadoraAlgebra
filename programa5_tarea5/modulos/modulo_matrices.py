@@ -395,10 +395,34 @@ def _efecto_operaciones_fila(A, fila_i, fila_j, k):
     return det, casos
 
 
+def _detalle_det(nombre, M):
+    """Líneas con el desarrollo completo del determinante de M."""
+    lineas = ["▸ Cálculo de det(" + nombre + "):"]
+    lineas += ["   " + linea for linea in pasos_determinante(M, nombre)]
+    lineas.append("")
+    return lineas
+
+
+def _detalle_inv(nombre, M):
+    """Líneas con el desarrollo completo de la inversa de M por Gauss-Jordan."""
+    lineas = ["▸ Cálculo de " + nombre + ":"]
+    lineas += ["   " + linea for linea in pasos_inversa_gauss_jordan(M)]
+    lineas.append("")
+    return lineas
+
+
+def _matriz_rotulada(nombre, M):
+    """Una matriz con su nombre encima, para el desarrollo."""
+    return ["▸ " + nombre + ":"] + ["   " + l for l in formato_matriz(M)] + [""]
+
+
 def _prop_inversa_de_la_inversa(A):
     """Propiedad 1: compara (A⁻¹)⁻¹ con A."""
     inv = inversa_gauss_jordan(A)
-    return inversa_gauss_jordan(inv), [f[:] for f in A], [("A⁻¹", inv)]
+    desarrollo = _detalle_inv("A⁻¹", A) + _detalle_inv("(A⁻¹)⁻¹", inv)
+    desarrollo.append("Invertir dos veces devuelve la matriz original.")
+    return (inversa_gauss_jordan(inv), [f[:] for f in A], [("A⁻¹", inv)],
+            desarrollo)
 
 
 def _prop_inversa_del_producto(A, B):
@@ -406,26 +430,40 @@ def _prop_inversa_del_producto(A, B):
     validar_cuadrada(B)
     AB = multiplicar_matrices(A, B)
     iA, iB = inversa_gauss_jordan(A), inversa_gauss_jordan(B)
-    return (inversa_gauss_jordan(AB), multiplicar_matrices(iB, iA),
-            [("A·B", AB), ("A⁻¹", iA), ("B⁻¹", iB)])
+    producto = multiplicar_matrices(iB, iA)
+    desarrollo = (_matriz_rotulada("A·B", AB) + _detalle_inv("(A·B)⁻¹", AB)
+                  + _detalle_inv("A⁻¹", A) + _detalle_inv("B⁻¹", B)
+                  + _matriz_rotulada("B⁻¹·A⁻¹", producto))
+    desarrollo.append("El orden se invierte: es B⁻¹·A⁻¹, no A⁻¹·B⁻¹.")
+    return inversa_gauss_jordan(AB), producto, [("A·B", AB)], desarrollo
 
 
 def _prop_inversa_de_la_transpuesta(A):
     """Propiedad 3: compara (Aᵀ)⁻¹ con (A⁻¹)ᵀ."""
     At, iA = transponer_matriz(A), inversa_gauss_jordan(A)
-    return (inversa_gauss_jordan(At), transponer_matriz(iA),
-            [("Aᵀ", At), ("A⁻¹", iA)])
+    desarrollo = (_matriz_rotulada("Aᵀ", At) + _detalle_inv("(Aᵀ)⁻¹", At)
+                  + _detalle_inv("A⁻¹", A)
+                  + _matriz_rotulada("(A⁻¹)ᵀ", transponer_matriz(iA)))
+    desarrollo.append("Da lo mismo transponer y después invertir, que "
+                      "invertir y después transponer.")
+    return (inversa_gauss_jordan(At), transponer_matriz(iA), [("Aᵀ", At)],
+            desarrollo)
 
 
 def _prop_determinante_de_la_inversa(A, propiedad):
-    """Propiedad 4: compara det(A⁻¹) con 1/det(A). Devuelve el informe listo."""
+    """Propiedad 4: compara det(A⁻¹) con 1/det(A)."""
     det = determinante(A)
     if det == 0:
         raise ValueError("La matriz es singular: det(A) = 0, no tiene inversa.")
     inv = inversa_gauss_jordan(A)
     izquierda, derecha = determinante(inv), Fraction(1) / det
+    desarrollo = (_detalle_det("A", A) + _detalle_inv("A⁻¹", A)
+                  + _detalle_det("A⁻¹", inv))
+    desarrollo += ["▸ Lado derecho:",
+                   "   1/det(A) = 1/(" + formato(det) + ") = " + formato(derecha),
+                   ""]
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": derecha, "intermedios": [("A⁻¹", inv)],
+            "derecha": derecha, "intermedios": [], "desarrollo": desarrollo,
             "se_cumple": izquierda == derecha}
 
 
@@ -433,10 +471,13 @@ def _prop_triangular(A, propiedad):
     """Propiedad 6: compara el determinante por reducción con el de cofactores."""
     por_cofactores = determinante(A)
     por_reduccion, intercambios, triangular = determinante_por_reduccion(A)
+    desarrollo = ["▸ Lado izquierdo: por reducción a triangular", ""]
+    desarrollo += ["   " + linea for linea in pasos_reduccion(A)]
+    desarrollo += ["", "▸ Lado derecho: por expansión de cofactores", ""]
+    desarrollo += ["   " + linea for linea in pasos_determinante(A)]
     return {"propiedad": propiedad, "tipo": "escalar",
             "izquierda": por_reduccion, "derecha": por_cofactores,
-            "intermedios": [("Triangular (" + str(intercambios)
-                             + " intercambio(s))", triangular)],
+            "intermedios": [], "desarrollo": desarrollo,
             "se_cumple": por_reduccion == por_cofactores}
 
 
@@ -444,24 +485,33 @@ def _prop_det_transpuesta(A, propiedad):
     """Propiedad 7: transponer no cambia el determinante."""
     At = transponer_matriz(A)
     izquierda, derecha = determinante(At), determinante(A)
+    desarrollo = (_matriz_rotulada("Aᵀ", At) + _detalle_det("Aᵀ", At)
+                  + _detalle_det("A", A))
+    desarrollo.append("Transponer no cambia el determinante: desarrollar por "
+                      "filas o por columnas da lo mismo.")
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": derecha, "intermedios": [("Aᵀ", At)],
+            "derecha": derecha, "intermedios": [], "desarrollo": desarrollo,
             "se_cumple": izquierda == derecha}
 
 
 def _prop_det_producto(A, B, propiedad):
     """Propiedad 8: el determinante de un producto es el producto de los
-    determinantes. Es la única propiedad del determinante que "respeta" la
+    determinantes. Es la única propiedad del determinante que respeta la
     multiplicación; con la suma no ocurre."""
     if B is None:
         raise ValueError("Esta propiedad necesita también la matriz B.")
     validar_cuadrada(B)
     AB = multiplicar_matrices(A, B)
     izquierda = determinante(AB)
-    derecha = determinante(A) * determinante(B)
+    det_a, det_b = determinante(A), determinante(B)
+    desarrollo = (_matriz_rotulada("A·B", AB) + _detalle_det("A·B", AB)
+                  + _detalle_det("A", A) + _detalle_det("B", B))
+    desarrollo += ["▸ Lado derecho:",
+                   "   det(A)·det(B) = (" + formato(det_a) + ")·("
+                   + formato(det_b) + ") = " + formato(det_a * det_b), ""]
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": derecha, "intermedios": [("A·B", AB)],
-            "se_cumple": izquierda == derecha}
+            "derecha": det_a * det_b, "intermedios": [],
+            "desarrollo": desarrollo, "se_cumple": izquierda == det_a * det_b}
 
 
 def _prop_det_escalar(A, k, propiedad):
@@ -470,11 +520,21 @@ def _prop_det_escalar(A, k, propiedad):
     n = validar_cuadrada(A)
     kA = escalar_por_matriz(k, A)
     izquierda = determinante(kA)
-    derecha = (k ** n) * determinante(A)
+    det_a = determinante(A)
+    desarrollo = (_matriz_rotulada("kA = (" + formato(k) + ")·A", kA)
+                  + _detalle_det("kA", kA) + _detalle_det("A", A))
+    desarrollo += ["▸ Lado derecho:",
+                   "   n = " + str(n) + "  (la matriz es " + str(n) + "×"
+                   + str(n) + ", el escalar multiplica a sus " + str(n)
+                   + " filas)",
+                   "   kⁿ = (" + formato(k) + ")" + con_exponente(n) + " = "
+                   + formato(k ** n),
+                   "   kⁿ·det(A) = (" + formato(k ** n) + ")·("
+                   + formato(det_a) + ") = " + formato((k ** n) * det_a), ""]
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": derecha,
-            "intermedios": [("(" + formato(k) + ")·A", kA)],
-            "se_cumple": izquierda == derecha}
+            "derecha": (k ** n) * det_a, "intermedios": [],
+            "desarrollo": desarrollo,
+            "se_cumple": izquierda == (k ** n) * det_a}
 
 
 def _prop_fila_de_ceros(A, fila_i, propiedad):
@@ -484,11 +544,14 @@ def _prop_fila_de_ceros(A, fila_i, propiedad):
     M = [fila[:] for fila in A]
     M[fila_i] = [Fraction(0)] * n
     izquierda = determinante(M)
+    desarrollo = _matriz_rotulada("A con la fila " + str(fila_i + 1)
+                                  + " puesta en ceros", M)
+    desarrollo += _detalle_det("esa matriz", M)
+    desarrollo.append("Al desarrollar por esa fila todos los términos se "
+                      "anulan, así que el determinante es 0.")
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": Fraction(0),
-            "intermedios": [("A con la fila " + str(fila_i + 1)
-                             + " puesta en ceros", M)],
-            "se_cumple": izquierda == 0}
+            "derecha": Fraction(0), "intermedios": [],
+            "desarrollo": desarrollo, "se_cumple": izquierda == 0}
 
 
 def _prop_filas_iguales(A, fila_i, fila_j, propiedad):
@@ -501,11 +564,14 @@ def _prop_filas_iguales(A, fila_i, fila_j, propiedad):
     M = [fila[:] for fila in A]
     M[fila_i] = M[fila_j][:]
     izquierda = determinante(M)
+    desarrollo = _matriz_rotulada("A con F" + str(fila_i + 1)
+                                  + " copiada de F" + str(fila_j + 1), M)
+    desarrollo += _detalle_det("esa matriz", M)
+    desarrollo.append("Restando una fila de la otra queda una fila de ceros, "
+                      "y el determinante es 0.")
     return {"propiedad": propiedad, "tipo": "escalar", "izquierda": izquierda,
-            "derecha": Fraction(0),
-            "intermedios": [("A con F" + str(fila_i + 1) + " copiada de F"
-                             + str(fila_j + 1), M)],
-            "se_cumple": izquierda == 0}
+            "derecha": Fraction(0), "intermedios": [],
+            "desarrollo": desarrollo, "se_cumple": izquierda == 0}
 
 
 def _prop_definicion_de_inversa(A, propiedad):
@@ -518,10 +584,14 @@ def _prop_definicion_de_inversa(A, propiedad):
                          "inversa, así que esta propiedad no se le aplica.")
     inv = inversa_gauss_jordan(A)
     por_derecha, por_izquierda, _ = comprobar_inversa(A, inv)
+    desarrollo = (_detalle_inv("A⁻¹", A)
+                  + _matriz_rotulada("A⁻¹ · A", por_izquierda)
+                  + _matriz_rotulada("A · A⁻¹", por_derecha))
+    desarrollo.append("Los dos productos dan la identidad, que es justo lo "
+                      "que define a la inversa.")
     return {"propiedad": propiedad, "tipo": "matriz",
             "izquierda": por_izquierda, "derecha": _identidad(n),
-            "intermedios": [("A⁻¹", inv), ("A·A⁻¹ (el otro orden)",
-                                           por_derecha)],
+            "intermedios": [], "desarrollo": desarrollo,
             "se_cumple": por_izquierda == _identidad(n)
             and por_derecha == _identidad(n)}
 
@@ -531,8 +601,14 @@ def _informe_operaciones_fila(A, fila_i, fila_j, k, propiedad):
     if k is None:
         raise ValueError("Falta el escalar k para esta propiedad.")
     det, casos = _efecto_operaciones_fila(A, fila_i, fila_j, k)
+    desarrollo = _detalle_det("A", A)
+    for nombre, matriz in (("Intercambio", _intercambiar(A, fila_i, fila_j)),
+                           ("Reemplazo", _reemplazar(A, fila_i, fila_j, k)),
+                           ("Escalamiento", _escalar_fila(A, fila_i, k))):
+        desarrollo += _matriz_rotulada(nombre, matriz)
+        desarrollo += _detalle_det(nombre, matriz)
     return {"propiedad": propiedad, "tipo": "casos", "det": det,
-            "casos": casos,
+            "casos": casos, "desarrollo": desarrollo,
             "se_cumple": all(obt == esp for _, obt, esp in casos)}
 
 
@@ -545,10 +621,10 @@ def _exigir_k(k):
 
 def _informe_matriz(calculo, propiedad):
     """Arma el informe de una propiedad cuyos dos miembros son matrices."""
-    izquierda, derecha, intermedios = calculo()
+    izquierda, derecha, intermedios, desarrollo = calculo()
     return {"propiedad": propiedad, "tipo": "matriz", "izquierda": izquierda,
             "derecha": derecha, "intermedios": intermedios,
-            "se_cumple": izquierda == derecha}
+            "desarrollo": desarrollo, "se_cumple": izquierda == derecha}
 
 
 # Cada propiedad se despacha por su NOMBRE, no por su número de orden, para
@@ -1376,28 +1452,34 @@ class MatricesOpsApp:
         except (ValueError, IndexError) as e:
             self._mostrar_error(str(e))
 
+    def _texto_casos(self, res):
+        """Arma el texto de una verificación de tipo «casos»: el determinante
+        y, por cada operación de fila, el valor obtenido y el esperado."""
+        lineas = ["det(A) = " + formato(res["det"])]
+        for nombre, obtenido, esperado in res["casos"]:
+            lineas += ["", nombre, "   obtenido: " + formato(obtenido)
+                       + "    esperado: " + formato(esperado)]
+        return "\n".join(lineas)
+
     def _mostrar_informe_inversa(self, res):
-        """Arma el texto del resultado de una verificación y lo muestra."""
+        """Muestra el resultado de una verificación en el panel de resultado,
+        sea el resultado una matriz, un número o una lista de casos."""
         conclusion = ("Conclusión: se cumple " + res["propiedad"] + "."
                       if res["se_cumple"] else
                       "Conclusión: los miembros no coinciden; revisa los datos.")
-        if res["tipo"] == "casos":
-            lineas = ["det(A) = " + formato(res["det"]), ""]
-            for nombre, obtenido, esperado in res["casos"]:
-                lineas += [nombre, "   obtenido: " + formato(obtenido)
-                           + "    esperado: " + formato(esperado)]
-            self._mostrar_aviso("\n".join(lineas) + "\n\n" + conclusion)
-            return
         pasos = ["VERIFICACIÓN DE: " + res["propiedad"], ""]
         for titulo, M in res.get("intermedios", []):
             pasos += [titulo + ":", *formato_matriz(M), ""]
-        if res["tipo"] == "escalar":
-            detalle = ("Lado izquierdo : " + formato(res["izquierda"])
-                       + "\nLado derecho   : " + formato(res["derecha"])
-                       + "\n\n" + conclusion)
-            pasos += [detalle]
-            self._mostrar_aviso(detalle)
+        pasos += res.get("desarrollo", [])
+
+        if res["tipo"] in ("casos", "escalar"):
+            cuerpo = (self._texto_casos(res) if res["tipo"] == "casos"
+                      else "Lado izquierdo : " + formato(res["izquierda"])
+                      + "\nLado derecho   : " + formato(res["derecha"]))
+            pasos += cuerpo.split("\n") + ["", conclusion]
+            self._mostrar_valor(res["propiedad"], cuerpo, conclusion, pasos)
             return
+
         pasos += ["LADO IZQUIERDO:", *formato_matriz(res["izquierda"]), "",
                   "LADO DERECHO:", *formato_matriz(res["derecha"]), "", conclusion]
         self._mostrar_matriz("Lado izquierdo de " + res["propiedad"],
@@ -1624,7 +1706,8 @@ class MatricesOpsApp:
                  fg=color, anchor="w").pack(fill="x", padx=2, pady=(6, 2))
         return sub
 
-    def _mostrar_matriz(self, titulo, C, detalle="", pasos=None):
+    def _limpiar_panel(self):
+        """Vacía el panel de resultado y lo deja listo para escribir."""
         for hijo in self.frame_resultado.winfo_children():
             hijo.destroy()
         if self.aviso_vacio is not None:
@@ -1637,11 +1720,43 @@ class MatricesOpsApp:
         self.procedimiento_visible = False
         self.sub_procedimiento = None
 
+    def _cartel_resultado(self, titulo):
+        """Dibuja la tarjeta RESULTADO con su cartel azul y la devuelve."""
         sub = self._sub_tarjeta("RESULTADO", ACENTO)
         cartel = tk.Frame(sub, bg=ACENTO, padx=14, pady=10)
         cartel.pack(fill="x", pady=(0, 6))
-        self._texto_ajustable(tk.Label(cartel, text=titulo, font=self.fuente_big,
-                                       bg=ACENTO, fg=FONDO)).pack(fill="x")
+        self._texto_ajustable(tk.Label(cartel, text=titulo,
+                                       font=self.fuente_big, bg=ACENTO,
+                                       fg=FONDO)).pack(fill="x")
+        return sub
+
+    def _detalle_resultado(self, sub, detalle):
+        """Agrega el texto explicativo bajo el resultado, si lo hay."""
+        if not detalle:
+            return
+        self._texto_ajustable(tk.Label(sub, text=detalle,
+                                       font=self.fuente_body, bg=TARJETA,
+                                       fg=TEXTO_SUAVE, justify="left",
+                                       anchor="w", wraplength=480)
+                              ).pack(fill="x", pady=(0, 8))
+
+    def _cerrar_panel(self, titulo, C, pasos):
+        """Guarda el último resultado y prepara el botón de procedimiento."""
+        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos,
+                                 "procedimiento_titulo": "DESARROLLO PASO A PASO"}
+        self.boton_procedimiento.configure(text="Ver procedimiento")
+        if pasos:
+            self.boton_procedimiento.pack(side="right")
+        else:
+            self.boton_procedimiento.pack_forget()
+        self.lienzo_resultado.yview_moveto(0)
+        self.raiz.update_idletasks()
+        self._ajustar_textos()
+
+    def _mostrar_matriz(self, titulo, C, detalle="", pasos=None):
+        """Muestra una matriz en el panel de resultado."""
+        self._limpiar_panel()
+        sub = self._cartel_resultado(titulo)
         filas = _leer_dimensiones(C)
         self._texto_ajustable(tk.Label(sub, text="Matriz resultante de tamaño "
                                        + str(filas[0]) + "×" + str(filas[1]),
@@ -1650,23 +1765,20 @@ class MatricesOpsApp:
         self._texto_ajustable(tk.Label(sub, text="\n".join(formato_matriz(C)),
                                        font=self.fuente_mono, bg=TARJETA, fg=TEXTO,
                                        justify="left", anchor="w")).pack(fill="x", pady=(0, 6))
-        if detalle:
-            self._texto_ajustable(tk.Label(sub, text=detalle, font=self.fuente_body,
-                                           bg=TARJETA, fg=TEXTO_SUAVE, justify="left",
-                                           anchor="w", wraplength=480)).pack(fill="x",
-                                                                             pady=(0, 8))
+        self._detalle_resultado(sub, detalle)
+        self._cerrar_panel(titulo, C, pasos)
 
-        self.ultimo_resultado = {"titulo": titulo, "matriz": C, "pasos": pasos,
-                                 "procedimiento_titulo": "DESARROLLO PASO A PASO"}
-        self.boton_procedimiento.configure(text="Ver procedimiento")
-        if pasos:
-            self.boton_procedimiento.pack(side="right")
-        else:
-            self.boton_procedimiento.pack_forget()
-
-        self.lienzo_resultado.yview_moveto(0)
-        self.raiz.update_idletasks()
-        self._ajustar_textos()
+    def _mostrar_valor(self, titulo, cuerpo, detalle="", pasos=None):
+        """Muestra en el panel algo que no es una matriz: un número, una
+        comparación de dos lados o una lista de casos. Usa la misma tarjeta
+        que _mostrar_matriz para que todas las respuestas se vean igual."""
+        self._limpiar_panel()
+        sub = self._cartel_resultado(titulo)
+        self._texto_ajustable(tk.Label(sub, text=cuerpo, font=self.fuente_mono,
+                                       bg=TARJETA, fg=TEXTO, justify="left",
+                                       anchor="w")).pack(fill="x", pady=(0, 6))
+        self._detalle_resultado(sub, detalle)
+        self._cerrar_panel(titulo, None, pasos)
 
     def _alternar_procedimiento(self):
         if not self.ultimo_resultado or not self.ultimo_resultado.get("pasos"):
@@ -1701,13 +1813,6 @@ class MatricesOpsApp:
 
     def _mostrar_error(self, mensaje):
         messagebox.showerror("Operación no válida", mensaje)
-
-    def _mostrar_aviso(self, mensaje):
-        """Muestra un resultado correcto (no un error) en una ventana aparte.
-        Se usa cuando la verificación no devuelve una matriz que pintar en el
-        panel de resultados, sino números o una lista de casos."""
-        messagebox.showinfo("Verificación de propiedad", mensaje)
-
 
     def _ver_teoremas(self):
         """Opción '0. Ver Teoremas Clave del Módulo' que pide la Tarea 4.
