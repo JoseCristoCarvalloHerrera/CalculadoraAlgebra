@@ -175,32 +175,34 @@ def _escribir_termino(A, tipo, indice, pos, pasos):
     return aporte
 
 
-def pasos_determinante(A):
+def pasos_determinante(A, nombre="A"):
     """Desarrollo completo del determinante por expansión de cofactores,
-    eligiendo la fila o columna con más ceros, como se hace en clase."""
+    eligiendo la fila o columna con más ceros, como se hace en clase.
+    'nombre' es el rótulo de la matriz, para poder incrustar el desarrollo
+    dentro de otro (por ejemplo al verificar det(kA) = kⁿ·det(A))."""
     n = validar_cuadrada(A)
     A = [[Fraction(valor) for valor in fila] for fila in A]
     if n == 1:
-        return ["Matriz 1x1: det(A) = " + formato(A[0][0])]
+        return ["Matriz 1x1: det(" + nombre + ") = " + formato(A[0][0])]
     if n == 2:
-        return ["Matriz 2x2: det(A) = ad - bc",
+        return ["Matriz 2x2: det(" + nombre + ") = ad - bc",
                 "   = (" + formato(A[0][0]) + ")(" + formato(A[1][1])
                 + ") - (" + formato(A[0][1]) + ")(" + formato(A[1][0])
                 + ") = " + formato(determinante(A))]
 
     tipo, indice, ceros = _linea_con_mas_ceros(A, n)
-    pasos = ["DETERMINANTE POR EXPANSIÓN DE COFACTORES", "",
+    pasos = ["DETERMINANTE DE " + nombre + " POR EXPANSIÓN DE COFACTORES", "",
              "Se desarrolla por la " + tipo + " " + str(indice + 1)
              + ", que es la que tiene más ceros (" + str(ceros) + ").",
              "Cada cero anula un término completo.", "",
-             "det(A) = suma de aij · (-1)ⁱ⁺ʲ · det(Mij) sobre esa "
+             "det(" + nombre + ") = suma de aij · (-1)ⁱ⁺ʲ · det(Mij) sobre esa "
              + tipo, ""]
     sumandos = [_escribir_termino(A, tipo, indice, pos, pasos)
                 for pos in range(n)]
     pasos.append("Suma de los términos:")
-    pasos.append("   det(A) = " + " + ".join("(" + formato(v) + ")"
-                                             for v in sumandos))
-    pasos.append("   det(A) = " + formato(determinante(A)))
+    pasos.append("   det(" + nombre + ") = "
+                 + " + ".join("(" + formato(v) + ")" for v in sumandos))
+    pasos.append("   det(" + nombre + ") = " + formato(determinante(A)))
     return pasos
 
 
