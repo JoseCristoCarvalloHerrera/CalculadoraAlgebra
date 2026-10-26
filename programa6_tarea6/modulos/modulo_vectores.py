@@ -31,7 +31,7 @@ from tkinter import ttk, messagebox, font as tkfont
 
 from modulos import (
     FONDO, TARJETA, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
-    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, EXITO, ADVERTENCIA, ERROR,
+    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, CELDA_FOCO, EXITO, ADVERTENCIA, ERROR,
     LETRA_MONO, MAX_DIMENSION, AYUDA_NUMERO,
     a_numero, formato, formato_matriz, con_subindice, nombre_variable,
     _validar_matriz, _leer_dimensiones, LOGO_VECTORES,
@@ -553,7 +553,9 @@ class VectoresApp:
         tk.Label(fila_esc, text="Escalar x =", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
         tk.Entry(fila_esc, textvariable=self.var_escalar, font=self.fuente_mono,
-                 width=6, justify="center", relief="solid", bd=1
+                 width=6, justify="center", relief="solid", bd=1,
+                 bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                 selectbackground=CELDA_FOCO, selectforeground=TEXTO
                  ).pack(side="left", padx=6)
 
         self.frame_vectores = tk.Frame(tarjeta, bg=TARJETA)
@@ -606,12 +608,16 @@ class VectoresApp:
                 self.celdas[(i, j)] = var
                 tk.Entry(self.frame_vectores, textvariable=var, font=self.fuente_mono,
                          width=6, justify="center", relief="solid", bd=1,
-                         bg=CELDA_FONDO).grid(row=i + 1, column=j, padx=3, pady=2)
+                         bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                         selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                         ).grid(row=i + 1, column=j, padx=3, pady=2)
             var_y = tk.StringVar(value=previos_y.get(i, ""))
             self.celdas_y[i] = var_y
             tk.Entry(self.frame_vectores, textvariable=var_y, font=self.fuente_mono,
                      width=6, justify="center", relief="solid", bd=1,
-                     bg=CELDA_FONDO).grid(row=i + 1, column=k + 1, padx=(14, 3), pady=2)
+                     bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                     selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                     ).grid(row=i + 1, column=k + 1, padx=(14, 3), pady=2)
 
     # ---------- lectura de datos ----------
     def _leer_vectores(self):

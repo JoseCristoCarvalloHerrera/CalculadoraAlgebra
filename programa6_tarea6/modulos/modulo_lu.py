@@ -27,7 +27,7 @@ from tkinter import ttk, messagebox, font as tkfont
 
 from modulos import (
     FONDO, TARJETA, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
-    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, EXITO, ERROR, ADVERTENCIA,
+    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, CELDA_FOCO, EXITO, ERROR, ADVERTENCIA,
     LETRA_MONO, MAX_DIMENSION,
     a_numero, formato, formato_matriz, con_subindice,
     _validar_matriz, _leer_dimensiones, LOGO_LU,
@@ -666,7 +666,9 @@ class LUApp:
                 self.celdas_A[(i, j)] = var
                 tk.Entry(self.frame_A, textvariable=var, font=self.fuente_mono,
                          width=6, justify="center", relief="solid", bd=1,
-                         bg=CELDA_FONDO).grid(row=i + 1, column=j, padx=3, pady=2)
+                         bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                         selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                         ).grid(row=i + 1, column=j, padx=3, pady=2)
 
         for hijo in self.frame_b.winfo_children():
             hijo.destroy()
@@ -676,7 +678,9 @@ class LUApp:
             self.celdas_b[i] = var
             tk.Entry(self.frame_b, textvariable=var, font=self.fuente_mono,
                      width=10, justify="center", relief="solid", bd=1,
-                     bg=CELDA_FONDO).grid(row=i, column=0, pady=2)
+                     bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                     selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                     ).grid(row=i, column=0, pady=2)
 
     def _leer_matriz(self, celdas, m, n, nombre):
         matriz = []

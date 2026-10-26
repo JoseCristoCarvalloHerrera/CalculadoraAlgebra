@@ -24,7 +24,7 @@ from tkinter import ttk, messagebox, font as tkfont
 
 from modulos import (
     FONDO, TARJETA, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
-    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, EXITO, ADVERTENCIA, ERROR,
+    BOTON_SEC, BOTON_SEC_HOVER, CELDA_FONDO, CELDA_FOCO, EXITO, ADVERTENCIA, ERROR,
     LETRA_MONO, MAX_DIMENSION, AYUDA_NUMERO,
     a_numero, formato, formato_matriz, con_subindice, con_exponente,
     _es_matriz_valida, _validar_matriz, _leer_dimensiones, LOGO_MATRICES,
@@ -1087,7 +1087,10 @@ class MatricesOpsApp:
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
         tk.Entry(self.frame_escalar_ax, textvariable=self.var_escalar_ax,
                  font=self.fuente_mono, width=7, justify="center",
-                 relief="solid", bd=1).pack(side="left", padx=6)
+                 relief="solid", bd=1,
+                 bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                 selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                 ).pack(side="left", padx=6)
 
         self.frame_vectores_ax = tk.Frame(cont, bg=TARJETA)
         self.frame_vectores_ax.pack(fill="x", pady=(4, 2))
@@ -1125,7 +1128,10 @@ class MatricesOpsApp:
         tk.Label(fila_r, text="Escalar r =", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
         tk.Entry(fila_r, textvariable=self.var_escalar_t, font=self.fuente_mono,
-                 width=7, justify="center", relief="solid", bd=1).pack(side="left", padx=6)
+                 width=7, justify="center", relief="solid", bd=1,
+                 bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                 selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                 ).pack(side="left", padx=6)
         tk.Label(fila_r, text="(solo para (rA)ᵀ = r·Aᵀ)", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
 
@@ -1202,7 +1208,9 @@ class MatricesOpsApp:
                 self.celdas_vectores_ax[nombre][i] = variable
                 tk.Entry(marco, textvariable=variable, font=self.fuente_mono,
                          width=7, justify="center", relief="solid", bd=1,
-                         bg=CELDA_FONDO).grid(row=i + 1, column=0, pady=2)
+                         bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                         selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                         ).grid(row=i + 1, column=0, pady=2)
 
     def _construir_grids(self):
         """Redibuja las cuadrículas de A y B conservando los valores previos."""
@@ -1224,7 +1232,9 @@ class MatricesOpsApp:
                     celdas[(i, j)] = var
                     tk.Entry(frame, textvariable=var, font=self.fuente_mono,
                              width=6, justify="center", relief="solid", bd=1,
-                             bg=CELDA_FONDO).grid(row=i + 1, column=j, padx=3, pady=2)
+                             bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                             selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                             ).grid(row=i + 1, column=j, padx=3, pady=2)
 
         ma = self._leer_dimension(self.var_ma, 2)
         na = self._leer_dimension(self.var_na, 2)
@@ -1247,7 +1257,10 @@ class MatricesOpsApp:
         tk.Label(fila, text="Escalar x =", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
         tk.Entry(fila, textvariable=self.var_escalar, font=self.fuente_mono,
-                 width=6, justify="center", relief="solid", bd=1).pack(side="left", padx=6)
+                 width=6, justify="center", relief="solid", bd=1,
+                 bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                 selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                 ).pack(side="left", padx=6)
 
         botones = tk.Frame(cont, bg=TARJETA)
         botones.pack(fill="x")
@@ -1384,7 +1397,10 @@ class MatricesOpsApp:
             tk.Label(fila, text=etiqueta + " =", font=self.fuente_body,
                      bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left", padx=(0, 3))
             tk.Entry(fila, textvariable=variable, font=self.fuente_mono, width=5,
-                     justify="center", relief="solid", bd=1).pack(side="left", padx=(0, 8))
+                     justify="center", relief="solid", bd=1,
+                     bg=CELDA_FONDO, fg=TEXTO, insertbackground=TEXTO,
+                     selectbackground=CELDA_FOCO, selectforeground=TEXTO
+                     ).pack(side="left", padx=(0, 8))
         tk.Label(fila, text="(operaciones de fila)", font=self.fuente_body,
                  bg=TARJETA, fg=TEXTO_SUAVE).pack(side="left")
 
