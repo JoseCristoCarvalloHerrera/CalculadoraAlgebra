@@ -274,6 +274,49 @@ TEOREMAS = {
    empaqueta los multiplicadores que normalmente se desechan. Resolver por
    LU es ventajoso cuando hay que resolver A·x = b para muchos vectores b
    distintos, porque la factorizacion se calcula una sola vez.""",
+
+
+    "espacios": """TEOREMAS CLAVE - MODULO 6: TRANSFORMACIONES LINEALES
+
+1. TRANSFORMACION MATRICIAL
+   Toda matriz A de m×n define una transformacion T: R^n -> R^m con
+        T(x) = A · x
+   T es LINEAL porque cumple las DOS propiedades que la definen:
+        a) Suma (aditividad):        T(u + v) = T(u) + T(v)
+        b) Multiplicacion por escalar: T(c·u) = c·T(u)
+   De las dos se deduce que T(0) = 0.
+
+2. NUCLEO (Kernel)
+   Nuc(T) = { x en R^n : A·x = 0 }: es el conjunto solucion del sistema
+   HOMOGENEO. Se halla reduciendo [A | 0]; cada VARIABLE LIBRE aporta un
+   vector a la base del nucleo. Es un subespacio de R^n.
+
+3. IMAGEN (Recorrido)
+   Im(T) = { A·x : x en R^n } = espacio generado por las COLUMNAS de A.
+   Una base son las COLUMNAS PIVOTE DE LA MATRIZ A ORIGINAL, no las de la
+   reducida: reducir por filas cambia el espacio generado por las
+   columnas. Es un subespacio de R^m.
+
+4. RANGO Y NULIDAD
+   rango(A)   = numero de columnas pivote = dim Im(T).
+   nulidad(A) = numero de variables libres = dim Nuc(T).
+
+5. TEOREMA DE LA DIMENSION (teorema del rango)
+   Para toda matriz A de m×n se cumple
+        rango(A) + nulidad(A) = n        (numero de COLUMNAS de A)
+   es decir   dim Im(T) + dim Nuc(T) = dimension del dominio.
+
+6. UNO A UNO Y SOBRE
+   T es UNO A UNO  <=>  Nuc(T) = {0}  <=>  nulidad = 0  <=>  las columnas
+                        de A son linealmente independientes.
+   T es SOBRE R^m  <=>  Im(T) = R^m   <=>  rango(A) = m  <=>  las columnas
+                        de A generan R^m.
+   Si A es cuadrada n×n, ser uno a uno, ser sobre y ser invertible son
+   equivalentes (Teorema de la Matriz Invertible).
+
+7. PERTENENCIA A LA IMAGEN
+   b esta en Im(T)  <=>  el sistema A·x = b es CONSISTENTE  <=>  b es
+   combinacion lineal de las columnas de A.""",
 }
 
 

@@ -3,10 +3,11 @@
 Calculadora de Álgebra Lineal - Programa 6 - Grupo #2.
 
 Punto de entrada del proyecto integrador. Abre el menú principal en
-ventana (Tkinter) o en consola, y desde ahí se llega a los cinco
+ventana (Tkinter) o en consola, y desde ahí se llega a los seis
 módulos: sistemas de ecuaciones, vectores e independencia lineal,
 álgebra de matrices con determinantes e inversa, determinantes, y
-factorización LU con solución de sistemas A·x = b.
+factorización LU con solución de sistemas A·x = b, y
+transformaciones lineales con núcleo, imagen, rango y nulidad.
 
 Temas de clase: Sesiones 1 a 12 de Álgebra Lineal (MTM0120).
 
@@ -57,8 +58,12 @@ from modulos.modulo_lu import (
     LUApp, factorizar_lu, verificar_factorizacion, resolver_lu, MENSAJE_SIN_PERMUTACION,
     pasos_comprobar_factorizacion, pasos_comprobar_solucion,
 )
+from modulos.modulo_espacios import (
+    EspaciosApp, analizar_transformacion, pertenece_a_la_imagen,
+    pasos_linealidad, pasos_comprobar_nucleo, pasos_teorema_dimension,
+)
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
-from modulos import modulo_sistemas, modulo_vectores, modulo_matrices, modulo_determinantes, modulo_lu
+from modulos import modulo_sistemas, modulo_vectores, modulo_matrices, modulo_determinantes, modulo_lu, modulo_espacios
 from teoremas.resumen_teoremas import mostrar_teoremas
 
 
@@ -110,6 +115,14 @@ class MenuPrincipal:
                            activebackground=ACENTO_HOVER, activeforeground=FONDO, command=self.abrir_lu)
         btn_lu.pack(pady=10)
 
+        btn_espacios = tk.Button(self.frame_menu,
+                                 text="Transformaciones Lineales (Núcleo e Imagen)",
+                                 font=("Montserrat", 13, "bold"),
+                                 bg=ACENTO, fg=FONDO, width=32, pady=15, relief="flat", cursor="hand2",
+                                 activebackground=ACENTO_HOVER, activeforeground=FONDO,
+                                 command=self.abrir_espacios)
+        btn_espacios.pack(pady=10)
+
 
         tk.Label(self.frame_menu, text="Desarrollado por Grupo 2 • Universidad Americana (UAM)", font=("Montserrat", 10), bg=FONDO, fg=TEXTO_SUAVE).pack(side="bottom", pady=40)
 
@@ -140,6 +153,12 @@ class MenuPrincipal:
         """Abre la pantalla del Módulo 5: Factorización LU y solución A·x = b."""
         self.frame_menu.pack_forget()
         LUApp(self.raiz, callback_volver=self.mostrar_menu)
+
+    def abrir_espacios(self):
+        """Abre la pantalla del Módulo 6: núcleo, imagen, rango y nulidad
+        de la transformación lineal T(x) = A·x."""
+        self.frame_menu.pack_forget()
+        EspaciosApp(self.raiz, callback_volver=self.mostrar_menu)
 
     def mostrar_menu(self):
         for widget in self.raiz.winfo_children():
@@ -677,6 +696,70 @@ def ejecutar_pruebas():
         probar("Avisa cuando requiere pivoteo parcial",
                str(error) == MENSAJE_SIN_PERMUTACION)
 
+    # =================================================================
+    # PRUEBAS DEL MÓDULO 6: NÚCLEO, IMAGEN, RANGO Y NULIDAD
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DEL MÓDULO 6: SUBESPACIOS")
+    print("--------------------------------")
+
+    # Matriz con la fila 2 proporcional a la fila 1: rango 2 y nulidad 1.
+    A_esp = [[fr(1), fr(2), fr(3)],
+             [fr(2), fr(4), fr(6)],
+             [fr(1), fr(1), fr(1)]]
+    datos_esp = analizar_transformacion(A_esp)
+    probar("Rango = cantidad de columnas pivote", datos_esp["rango"] == 2,
+           f"rango={datos_esp['rango']}")
+    probar("Nulidad = n - rango", datos_esp["nulidad"] == 1,
+           f"nulidad={datos_esp['nulidad']}")
+    probar("Teorema de la dimensión: rango + nulidad = n",
+           datos_esp["teorema_dimension"])
+    probar("La base del núcleo tiene un vector por variable libre",
+           len(datos_esp["base_nucleo"]) == 1,
+           f"base={datos_esp['base_nucleo']}")
+    probar("Cada vector de la base del núcleo cumple A·v = 0",
+           all(all(valor == 0 for valor in matriz_por_vector(A_esp, v))
+               for v in datos_esp["base_nucleo"]))
+    probar("La base de la imagen son las columnas pivote de A",
+           datos_esp["base_imagen"] == [[fr(1), fr(2), fr(1)],
+                                        [fr(2), fr(4), fr(1)]],
+           f"base={datos_esp['base_imagen']}")
+    probar("T no es uno a uno ni sobre cuando hay variables libres",
+           (not datos_esp["uno_a_uno"]) and (not datos_esp["sobre"]))
+
+    # Matriz invertible: el núcleo es {0} y T es uno a uno y sobre.
+    A_esp_inv = [[fr(1), fr(2), fr(0)],
+                 [fr(0), fr(1), fr(1)],
+                 [fr(1), fr(0), fr(1)]]
+    datos_inv = analizar_transformacion(A_esp_inv)
+    probar("Matriz invertible: núcleo = {0} y nulidad 0",
+           datos_inv["base_nucleo"] == [] and datos_inv["nulidad"] == 0)
+    probar("Matriz invertible: T es uno a uno y sobre",
+           datos_inv["uno_a_uno"] and datos_inv["sobre"])
+    probar("Matriz invertible: rango completo",
+           datos_inv["rango"] == 3 and datos_inv["teorema_dimension"])
+
+    # Las dos propiedades que definen una transformación lineal.
+    _, lineal_ok = pasos_linealidad(A_esp, [fr(1), fr(0), fr(2)],
+                                    [fr(-1), fr(3), fr(1)], fr(5))
+    probar("T(u+v) = T(u)+T(v)  y  T(c·u) = c·T(u)", lineal_ok)
+
+    # Pertenencia a la imagen: b = columna 1 + columna 2 sí está; (1,0,0) no.
+    dentro, _, _ = pertenece_a_la_imagen(A_esp, [fr(3), fr(6), fr(2)])
+    probar("b está en la imagen si A·x = b es consistente", dentro)
+    fuera, _, _ = pertenece_a_la_imagen(A_esp, [fr(1), fr(0), fr(0)])
+    probar("b no está en la imagen si el sistema es inconsistente", not fuera)
+
+    texto_nucleo = "\n".join(pasos_comprobar_nucleo(
+        A_esp, datos_esp["base_nucleo"])[0])
+    probar("El desarrollo del núcleo muestra la comprobación",
+           "pertenece al núcleo" in texto_nucleo and "✓" in texto_nucleo)
+    texto_teorema = "\n".join(pasos_teorema_dimension(datos_esp))
+    probar("El desarrollo del teorema muestra la suma",
+           "2 + 1 = 3" in texto_teorema
+           and "El teorema se cumple." in texto_teorema,
+           f"texto={texto_teorema[-120:]}")
+
     print("=" * 64)
     if fallos == 0:
         print("¡Excelente! Todas las comprobaciones pasaron correctamente.")
@@ -716,6 +799,7 @@ def menu_consola():
         print("   3. Álgebra de Matrices")
         print("   4. Determinantes y Propiedades")
         print("   5. Factorización LU y solución A·x = b")
+        print("   6. Transformaciones Lineales (Núcleo, Imagen, Rango)")
         print()
         print("   8. Ejecutar las pruebas automáticas")
         print("   9. Salir")
@@ -737,6 +821,8 @@ def menu_consola():
             modulo_determinantes.menu_consola()
         elif opcion == "5":
             modulo_lu.menu_consola()
+        elif opcion == "6":
+            modulo_espacios.menu_consola()
         elif opcion == "8":
             limpiar_pantalla()
             ejecutar_pruebas()
