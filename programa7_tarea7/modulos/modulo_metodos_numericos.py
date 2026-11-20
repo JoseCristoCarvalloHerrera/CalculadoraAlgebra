@@ -396,31 +396,472 @@ def preparar_datos_grafica(funcion, xmin, xmax, cantidad=2000):
     return segmentos
 
 
+def _texto_grafica(valor, cifras=8):
+    """Formatea números para etiquetas sin notación científica."""
+    return f"{float(valor):.{cifras}g}"
+
+
+def _latex_funcion(funcion):
+    """Devuelve la expresión en LaTeX para el recuadro de la gráfica."""
+    try:
+        texto = sp.latex(funcion.expresion)
+    except Exception:
+        return None
+    return texto or None
+
+
+def _tiene_raiz_cuadrada(expresion):
+    """Detecta raíces cuadradas aunque SymPy las guarde como potencias."""
+    for potencia in expresion.atoms(sp.Pow):
+        exponente = potencia.exp
+        if getattr(exponente, "is_Rational", False) and exponente.q == 2:
+            return True
+    return False
+
+
+def _descripcion_funcion(funcion, discontinuidades):
+    """Genera una descripción breve y humana de la función."""
+    expresion = funcion.expresion
+    if expresion.has(sp.log):
+        base = "Función logarítmica"
+    elif _tiene_raiz_cuadrada(expresion):
+        base = "Función con raíz cuadrada"
+    elif expresion.is_polynomial(_X):
+        base = "Función polinomial"
+    elif expresion.is_rational_function(_X):
+        base = "Función racional"
+    elif expresion.has(sp.sin, sp.cos, sp.tan):
+        base = "Función trigonométrica"
+    elif expresion.has(sp.exp):
+        base = "Función exponencial"
+    else:
+        base = "Función real de una variable"
+    if discontinuidades:
+        valores = ", ".join(
+            "x = " + _texto_grafica(punto) for punto in discontinuidades
+        )
+        if len(discontinuidades) == 1:
+            return base + " con asíntota vertical en " + valores
+        return base + " con asíntotas verticales en " + valores
+    return base
+
+
+def _caja_libre_para_inset(segmentos, xlim, ylim, raiz, fr,
+                           discontinuidades, evitar_arriba=False):
+    """Elige la esquina con menos curva para no tapar datos importantes."""
+    opciones = [
+        (0.06, 0.66, 0.30, 0.30),
+        (0.64, 0.66, 0.30, 0.30),
+        (0.06, 0.07, 0.30, 0.30),
+        (0.64, 0.07, 0.30, 0.30),
+    ]
+    rango_x = xlim[1] - xlim[0]
+    rango_y = ylim[1] - ylim[0]
+
+    def dentro(caja, fx, fy):
+        x0, y0, ancho, alto = caja
+        return x0 <= fx <= x0 + ancho and y0 <= fy <= y0 + alto
+
+    def cuenta(caja):
+        x0, y0, ancho, alto = caja
+        total = 0
+        for xs, ys in segmentos:
+            fx = (xs - xlim[0]) / rango_x
+            fy = (ys - ylim[0]) / rango_y
+            total += int(np.count_nonzero(
+                (fx >= x0) & (fx <= x0 + ancho) &
+                (fy >= y0) & (fy <= y0 + alto)
+            ))
+        return total
+
+    rx = (raiz - xlim[0]) / rango_x
+    ry = (fr - ylim[0]) / rango_y
+    mejor = opciones[0]
+    mejor_puntaje = float("inf")
+    for caja in opciones:
+        puntaje = 10 * cuenta(caja)
+        if dentro(caja, rx, ry):
+            puntaje += 100000
+        for punto in discontinuidades:
+            if dentro(caja, (punto - xlim[0]) / rango_x, 0.5):
+                puntaje += 5000
+        if evitar_arriba and caja[1] > 0.5:
+            puntaje += 500
+        if puntaje < mejor_puntaje:
+            mejor_puntaje = puntaje
+            mejor = caja
+    return mejor
+
+
 def crear_figura(funcion, xmin, xmax, resultado_biseccion=None, cantidad=2000):
-    """Crea una figura Matplotlib con función, intervalos y raíz opcionales."""
+    """Crea una gráfica tipo libro con colores y estilos inequívocos.
+
+    La función es azul continua; los ejes son grises con flechas; las
+    discontinuidades son rojas discontinuas; el intervalo inicial es ámbar y
+    el final naranja; la raíz es una estrella roja oscura. La ecuación se
+    muestra en el encabezado y cada elemento lleva una etiqueta directa.
+    """
+    import matplotlib.patheffects as path_effects
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+    from matplotlib.transforms import blended_transform_factory
 
     segmentos = preparar_datos_grafica(funcion, xmin, xmax, cantidad)
-    figura, eje = plt.subplots(figsize=(9, 5.5))
-    for indice, (xs, ys) in enumerate(segmentos):
-        eje.plot(xs, ys, color="#0077B6", linewidth=1.8,
-                 label="f(x)" if indice == 0 else None)
-    eje.axhline(0, color="#555555", linewidth=0.8)
-    eje.set_title("Gráfica de f(x) = " + funcion.texto)
-    eje.set_xlabel("x")
-    eje.set_ylabel("f(x)")
-    eje.grid(True, alpha=0.3)
+    figura, eje = plt.subplots(figsize=(10.0, 6.2))
+    figura.patch.set_facecolor("white")
+    eje.set_facecolor("white")
+
+    color_funcion = "#1D4E89"
+    color_eje = "#343A40"
+    color_asintota = "#D00000"
+    color_inicial = "#FFB703"
+    color_borde_inicial = "#B45309"
+    color_final = "#F77F00"
+    color_borde_final = "#C2410C"
+    color_raiz = "#9D0208"
+
+    for xs, ys in segmentos:
+        eje.plot(xs, ys, color=color_funcion, linewidth=2.6, zorder=4,
+                 solid_capstyle="round", solid_joinstyle="round")
+
+    discontinuidades = _puntos_singulares(funcion, xmin, xmax)
+
+    eje.set_axisbelow(True)
+    eje.grid(True, color="#E5E7EB", linewidth=0.8, linestyle="-", zorder=0)
+    eje.tick_params(axis="both", colors=color_eje, labelsize=9,
+                    length=3.5, width=0.9)
+    eje.xaxis.set_major_locator(MaxNLocator(nbins=9))
+    eje.yaxis.set_major_locator(MaxNLocator(nbins=8))
+    eje.ticklabel_format(style="plain", axis="both", useOffset=False)
+    # Los ejes y sus números quedan por encima de la curva para que las
+    # etiquetas se lean incluso cuando f(x) cruza el eje.
+    eje.xaxis.set_zorder(6)
+    eje.yaxis.set_zorder(6)
+
+    # Si una asíntota produce valores gigantes, la curva se aplana y deja de
+    # apreciarse. En ese caso se limita la vista a la zona típica y se avisa.
+    valores_y = np.concatenate([ys for _xs, ys in segmentos])
+    valores_y = valores_y[np.isfinite(valores_y)]
+    escala_ajustada = False
+    if len(valores_y) > 20:
+        minimo, maximo = float(np.min(valores_y)), float(np.max(valores_y))
+        q05, q95 = (float(valor) for valor in np.percentile(valores_y, [5, 95]))
+        rango_tipico = q95 - q05
+        if rango_tipico > 0 and (maximo - minimo) > 12 * rango_tipico:
+            margen = 0.18 * rango_tipico
+            eje.set_ylim(q05 - margen, q95 + margen)
+            escala_ajustada = True
+
+    eje.margins(x=0.03, y=0.08)
+    eje.autoscale_view()
+    xlim = eje.get_xlim()
+    ylim = eje.get_ylim()
+    eje.set_xlim(xlim)
+    eje.set_ylim(ylim)
+
+    rango_x = xlim[1] - xlim[0]
+    rango_y = ylim[1] - ylim[0]
+    transformacion = blended_transform_factory(eje.transData, eje.transAxes)
+
+    # Asíntotas: rojo discontinuo, separadas de la curva azul.
+    for indice, punto in enumerate(discontinuidades):
+        eje.axvline(punto, color=color_asintota, linewidth=1.8,
+                    linestyle=(0, (6, 4)), zorder=7)
+        etiqueta = "x = " + _texto_grafica(punto)
+        cerca_del_eje = (
+            xlim[0] <= 0 <= xlim[1] and abs(punto) < 0.08 * rango_x
+        )
+        if resultado_biseccion is None and len(discontinuidades) == 1:
+            if cerca_del_eje:
+                eje.text(punto + 0.018 * rango_x, 0.86, etiqueta,
+                         transform=transformacion, ha="left", va="bottom",
+                         fontsize=8.5, color="#7F1D1D", zorder=12,
+                         bbox=dict(facecolor="white",
+                                   edgecolor=color_asintota,
+                                   boxstyle="round,pad=0.2", alpha=0.95))
+            else:
+                eje.text(punto, 0.985, etiqueta, transform=transformacion,
+                         ha="center", va="bottom", fontsize=8.5,
+                         color="#7F1D1D", zorder=12, clip_on=False,
+                         bbox=dict(facecolor="white",
+                                   edgecolor=color_asintota,
+                                   boxstyle="round,pad=0.2", alpha=0.95))
+        else:
+            x_texto = punto + 0.012 * rango_x
+            alineacion = "left"
+            if x_texto > xlim[1] - 0.12 * rango_x:
+                x_texto = punto - 0.012 * rango_x
+                alineacion = "right"
+            eje.text(x_texto, 0.55, etiqueta, transform=transformacion,
+                     ha=alineacion, va="center", rotation=90, fontsize=8.2,
+                     color="#7F1D1D", zorder=12,
+                     bbox=dict(facecolor="white", edgecolor=color_asintota,
+                               boxstyle="round,pad=0.18", alpha=0.95))
+
     if resultado_biseccion is not None:
-        eje.scatter([resultado_biseccion.raiz], [resultado_biseccion.fr],
-                    color="#D62828", zorder=5, label="Raíz aproximada")
-        eje.axvspan(resultado_biseccion.a_inicial,
-                    resultado_biseccion.b_inicial, color="#90E0EF",
-                    alpha=0.22, label="Intervalo inicial")
-        eje.axvspan(resultado_biseccion.a_final,
-                    resultado_biseccion.b_final, color="#2A9D8F",
-                    alpha=0.20, label="Intervalo final")
-    eje.legend()
-    figura.tight_layout()
+        a_inicial = resultado_biseccion.a_inicial
+        b_inicial = resultado_biseccion.b_inicial
+        a_final = resultado_biseccion.a_final
+        b_final = resultado_biseccion.b_final
+        raiz = resultado_biseccion.raiz
+        fr = resultado_biseccion.fr
+
+        # Franjas de fondo: ámbar para el inicial y naranja para el final.
+        eje.axvspan(a_inicial, b_inicial, facecolor=color_inicial,
+                    edgecolor="none", alpha=0.18, zorder=1)
+        eje.axvspan(a_final, b_final, facecolor=color_final,
+                    edgecolor="none", alpha=0.55, zorder=2)
+        for limite in (a_inicial, b_inicial):
+            eje.axvline(limite, color=color_borde_inicial, linestyle="--",
+                        linewidth=1.5, zorder=3)
+        for limite in (a_final, b_final):
+            eje.axvline(limite, color=color_borde_final, linestyle="-",
+                        linewidth=2.0, zorder=4)
+
+        # Corchetes superiores con extremos visibles y etiquetas directas.
+        eje.plot([a_inicial, b_inicial], [0.94, 0.94],
+                 transform=transformacion, color=color_inicial,
+                 linewidth=5, solid_capstyle="butt", clip_on=False, zorder=8)
+        for limite in (a_inicial, b_inicial):
+            eje.plot([limite, limite], [0.925, 0.955],
+                     transform=transformacion, color=color_inicial,
+                     linewidth=2.2, clip_on=False, zorder=8)
+        eje.plot([a_final, b_final], [0.84, 0.84],
+                 transform=transformacion, color=color_final,
+                 linewidth=6, solid_capstyle="butt", clip_on=False, zorder=8)
+        for limite in (a_final, b_final):
+            eje.plot([limite, limite], [0.815, 0.865],
+                     transform=transformacion, color=color_borde_final,
+                     linewidth=2.4, clip_on=False, zorder=8)
+
+        centro_inicial = (a_inicial + b_inicial) / 2
+        centro_final = (a_final + b_final) / 2
+        eje.text(
+            centro_inicial, 0.955,
+            "Intervalo inicial [" + _texto_grafica(a_inicial, 6) + ", "
+            + _texto_grafica(b_inicial, 6) + "]",
+            transform=transformacion, ha="center", va="bottom",
+            fontsize=8.5, color="#7C4A00", zorder=9,
+            bbox=dict(facecolor="white", edgecolor=color_inicial,
+                      boxstyle="round,pad=0.22", alpha=0.96),
+        )
+
+        # La etiqueta del intervalo final se acerca a la zona de la raíz y
+        # apunta con una línea al intervalo, en vez de quedar lejos arriba.
+        x_etiqueta_final = centro_final + 0.055 * rango_x
+        alineacion_final = "left"
+        if x_etiqueta_final > xlim[1] - 0.30 * rango_x:
+            x_etiqueta_final = centro_final - 0.055 * rango_x
+            alineacion_final = "right"
+        eje.text(
+            x_etiqueta_final, 0.75,
+            "Intervalo final [" + _texto_grafica(a_final) + ", "
+            + _texto_grafica(b_final) + "]",
+            transform=transformacion, ha=alineacion_final, va="center",
+            fontsize=8.5, color="#7C2D12", zorder=9,
+            bbox=dict(facecolor="white", edgecolor=color_final,
+                      boxstyle="round,pad=0.22", alpha=0.96),
+        )
+        eje.annotate(
+            "", xy=(centro_final, 0.75),
+            xytext=(x_etiqueta_final, 0.75),
+            xycoords=transformacion, textcoords=transformacion,
+            arrowprops=dict(arrowstyle="-", color=color_borde_final,
+                            linewidth=1.1, shrinkA=4, shrinkB=0),
+            zorder=9,
+        )
+
+        # Raíz: línea punteada, estrella grande y etiqueta con sus valores.
+        eje.axvline(raiz, color=color_raiz, linestyle=(0, (2, 2)),
+                    linewidth=1.8, zorder=5)
+        eje.scatter([raiz], [fr], marker="o", s=105, color=color_raiz,
+                    edgecolor="white", linewidth=1.5, zorder=10)
+        rx = (raiz - xlim[0]) / rango_x
+        ry = (fr - ylim[0]) / rango_y
+        dx = 16 if rx < 0.72 else -16
+        dy = 38 if ry < 0.62 else -40
+        eje.annotate(
+            "xr ≈ " + _texto_grafica(raiz) + "\nf(xr) ≈ "
+            + _texto_grafica(fr, 4),
+            xy=(raiz, fr), xytext=(dx, dy), textcoords="offset points",
+            ha="left" if dx > 0 else "right",
+            va="bottom" if dy > 0 else "top",
+            fontsize=8.3, color="#7F1D1D", zorder=12,
+            bbox=dict(facecolor="white", edgecolor=color_raiz,
+                      boxstyle="round,pad=0.28", alpha=0.96),
+            arrowprops=dict(arrowstyle="-", color=color_raiz,
+                            linewidth=0.9, shrinkA=2, shrinkB=4),
+        )
+
+        # Recuadro de acercamiento: hace visible el intervalo final diminuto.
+        ancho_final = abs(b_final - a_final)
+        medio = max(ancho_final * 8, abs(b_inicial - a_inicial) * 0.002, 1e-9)
+        izquierda, derecha = raiz - medio, raiz + medio
+        xs_zoom = np.linspace(izquierda, derecha, 400)
+        ys_zoom = funcion.evaluar_vector(xs_zoom)
+        ys_zoom = np.where(np.isfinite(ys_zoom), ys_zoom, np.nan)
+        if np.isfinite(ys_zoom).any():
+            valores = ys_zoom[np.isfinite(ys_zoom)]
+            bajo, alto = float(np.min(valores)), float(np.max(valores))
+            margen = max((alto - bajo) * 0.25, abs(fr) * 0.05, 1e-9)
+            caja = _caja_libre_para_inset(
+                segmentos, xlim, ylim, raiz, fr, discontinuidades,
+                evitar_arriba=True,
+            )
+            inset = eje.inset_axes(caja)
+            inset.set_facecolor("white")
+            inset.set_zorder(15)
+            inset.plot(xs_zoom, ys_zoom, color=color_funcion,
+                       linewidth=2.0)
+            inset.axhline(0, color=color_eje, linewidth=0.8,
+                          linestyle=(0, (4, 3)))
+            inset.axvspan(a_final, b_final, facecolor=color_final,
+                          edgecolor=color_borde_final, alpha=0.55,
+                          linewidth=1.0)
+            inset.scatter([raiz], [fr], marker="o", s=52,
+                          color=color_raiz, edgecolor="white",
+                          linewidth=1.0, zorder=5)
+            inset.set_xlim(izquierda, derecha)
+            inset.set_ylim(bajo - margen, alto + margen)
+            inset.set_title("Acercamiento a la raíz", fontsize=7.3,
+                            fontweight="bold", color=color_funcion, pad=3)
+            inset.tick_params(axis="both", labelsize=6.5, length=2,
+                              width=0.6, pad=1.5, colors="#4B5563")
+            inset.xaxis.set_major_locator(MaxNLocator(4))
+            inset.yaxis.set_major_locator(MaxNLocator(4))
+            inset.ticklabel_format(style="plain", axis="both",
+                                   useOffset=False)
+            inset.grid(True, color="#E5E7EB", linestyle=":",
+                       linewidth=0.5)
+            for borde in inset.spines.values():
+                borde.set_color("#D1D5DB")
+                borde.set_linewidth(0.8)
+
+    else:
+        x_intercepto = 0.0 if xmin <= 0 <= xmax else None
+        if x_intercepto is not None:
+            try:
+                y_intercepto = funcion.evaluar(x_intercepto)
+            except ErrorFuncion:
+                y_intercepto = None
+            if (y_intercepto is not None
+                    and ylim[0] + 0.02 * rango_y < y_intercepto
+                    < ylim[1] - 0.02 * rango_y
+                    and abs(y_intercepto) > 0.02 * rango_y):
+                eje.scatter([x_intercepto], [y_intercepto], s=52,
+                            color=color_funcion, edgecolor="white",
+                            linewidth=1.1, zorder=8)
+                tinte = (y_intercepto - ylim[0]) / rango_y
+                dy = -17 if tinte < 0.70 else 17
+                eje.annotate(
+                    "(0, " + _texto_grafica(y_intercepto, 5) + ")",
+                    xy=(x_intercepto, y_intercepto),
+                    xytext=(10, dy), textcoords="offset points",
+                    ha="left", va="top" if dy < 0 else "bottom",
+                    fontsize=8.0, color="#1F2937", zorder=10,
+                    bbox=dict(facecolor="white", edgecolor="#D1D5DB",
+                              boxstyle="round,pad=0.2", alpha=0.94),
+                )
+
+    if escala_ajustada:
+        eje.text(
+            0.5, 0.018,
+            "Escala vertical ajustada: los valores extremos siguen fuera de la vista.",
+            transform=eje.transAxes, ha="center", va="bottom",
+            fontsize=7.4, style="italic", color="#6B7280", zorder=13,
+            bbox=dict(facecolor="white", edgecolor="#E5E7EB",
+                      boxstyle="round,pad=0.25", alpha=0.92),
+        )
+
+    # Ejes tipo libro: se cruzan en el origen cuando el cero está en la vista.
+    x0 = 0.0 if xlim[0] <= 0 <= xlim[1] else xlim[0]
+    y0 = 0.0 if ylim[0] <= 0 <= ylim[1] else ylim[0]
+    # Si los ejes se cruzan en el origen, se evita repetir el cero de ambos
+    # ejes en el mismo punto.
+    if abs(x0) < 1e-12 and abs(y0) < 1e-12:
+        for posicion, etiqueta in zip(eje.get_yticks(), eje.get_yticklabels()):
+            if abs(float(posicion)) < 1e-9:
+                etiqueta.set_visible(False)
+                break
+    for nombre in ("top", "right"):
+        eje.spines[nombre].set_visible(False)
+    for nombre in ("left", "bottom"):
+        eje.spines[nombre].set_color(color_eje)
+        eje.spines[nombre].set_linewidth(1.2)
+        eje.spines[nombre].set_zorder(6)
+    eje.spines["left"].set_position(("data", x0))
+    eje.spines["bottom"].set_position(("data", y0))
+
+    eje.annotate(
+        "", xy=(xlim[1] + 0.012 * rango_x, y0),
+        xytext=(xlim[1] - 0.018 * rango_x, y0),
+        arrowprops=dict(arrowstyle="-|>", color=color_eje,
+                        linewidth=1.2, mutation_scale=14,
+                        shrinkA=0, shrinkB=0),
+        annotation_clip=False, zorder=7,
+    )
+    eje.annotate(
+        "", xy=(x0, ylim[1] + 0.012 * rango_y),
+        xytext=(x0, ylim[1] - 0.018 * rango_y),
+        arrowprops=dict(arrowstyle="-|>", color=color_eje,
+                        linewidth=1.2, mutation_scale=14,
+                        shrinkA=0, shrinkB=0),
+        annotation_clip=False, zorder=7,
+    )
+
+    eje.text(
+        1.014, y0, r"$x$",
+        transform=blended_transform_factory(eje.transAxes, eje.transData),
+        ha="left", va="center", fontsize=12, color=color_eje,
+        clip_on=False, zorder=8,
+    )
+    eje.text(
+        x0, 1.012, r"$f(x)$",
+        transform=blended_transform_factory(eje.transData, eje.transAxes),
+        ha="center", va="bottom", fontsize=12, color=color_eje,
+        clip_on=False, zorder=8,
+    )
+
+    for etiqueta in eje.get_xticklabels() + eje.get_yticklabels():
+        # Un contorno blanco hace legible el número sin tapar la curva con
+        # un rectángulo blanco cuando ambos se cruzan.
+        etiqueta.set_path_effects([
+            path_effects.withStroke(linewidth=2.2, foreground="white")
+        ])
+        etiqueta.set_zorder(9)
+
+    # Encabezado con la ecuación y una descripción breve.
+    latex = _latex_funcion(funcion)
+    descripcion = _descripcion_funcion(funcion, discontinuidades)
+    if latex:
+        if len(latex) > 80:
+            tamano = 10.5
+        elif len(latex) > 55:
+            tamano = 12.5
+        else:
+            tamano = 16.0
+        figura.text(
+            0.5, 0.975, "$f(x) = " + latex + "$",
+            ha="center", va="top", fontsize=tamano,
+            color=color_funcion, zorder=20,
+            bbox=dict(facecolor="white", edgecolor="#D1D5DB",
+                      boxstyle="round,pad=0.35", alpha=0.97),
+        )
+        figura.text(
+            0.5, 0.892, descripcion, ha="center", va="top",
+            fontsize=8.6, color="#6B7280", zorder=20,
+        )
+    else:
+        figura.text(
+            0.5, 0.965, "f(x) = " + funcion.texto, ha="center",
+            va="top", fontsize=13, color=color_funcion, zorder=20,
+        )
+        figura.text(
+            0.5, 0.892, descripcion, ha="center", va="top",
+            fontsize=8.6, color="#6B7280", zorder=20,
+        )
+
+    figura.tight_layout(rect=(0, 0, 1, 0.82))
     return figura
 
 
@@ -856,8 +1297,15 @@ class MetodosNumericosApp:
         tk.Button(marco, text="Usar última bisección", font=self.fuente_boton,
                   bg=BOTON_SEC, fg=TEXTO, relief="flat", padx=12, pady=8,
                   command=self._usar_ultima_biseccion).grid(row=4, column=0, columnspan=4, pady=4)
-        tk.Label(pestaña, text="Se excluyen valores fuera del dominio y se cortan segmentos en discontinuidades.",
-                 bg=FONDO, fg=TEXTO_SUAVE, font=self.fuente_body).pack(anchor="w", padx=30)
+        tk.Label(
+            pestaña,
+            text="Se excluyen valores fuera del dominio y se cortan segmentos "
+                 "en discontinuidades.\nEn la gráfica: f(x) azul, asíntota "
+                 "roja, intervalo inicial ámbar, intervalo final naranja y "
+                 "raíz rojo oscuro.",
+            justify="left", bg=FONDO, fg=TEXTO_SUAVE,
+            font=self.fuente_body,
+        ).pack(anchor="w", padx=35, pady=(0, 18))
 
     def _usar_ultima_biseccion(self):
         """Carga en el graficador la función y el intervalo de la última bisección."""

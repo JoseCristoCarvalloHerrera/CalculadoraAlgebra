@@ -33,3 +33,26 @@ programada en `modulos/modulo_metodos_numericos.py`.
 Se admite `x`, `pi`, `e`, `sin`, `cos`, `tan`, `exp`, `log`, `ln`, `sqrt`,
 `abs`, operaciones aritméticas y potencias con `**`. El símbolo `^` se rechaza
 porque no representa potencia en Python.
+
+## Gráficas
+
+La gráfica usa color, estilo de línea y etiquetas directas para que cada
+elemento se distinga sin ambigüedad:
+
+| Elemento | Estilo |
+| --- | --- |
+| `f(x)` | Azul oscuro, línea continua gruesa |
+| Ejes `x` y `f(x)` | Gris oscuro, con flechas en los extremos |
+| Discontinuidad o asíntota | Rojo, línea discontinua gruesa |
+| Intervalo inicial `[a, b]` | Franja y corchete ámbar |
+| Intervalo final | Franja y corchete naranja |
+| Raíz aproximada | Estrella rojo oscuro con línea punteada |
+
+La ecuación de la función aparece en el encabezado, con una descripción breve.
+Cada elemento tiene además una etiqueta directa, así que no hace falta una
+leyenda que tape la gráfica.
+
+Después de una bisección se muestra un recuadro de acercamiento a la raíz, con
+su valor y el de `f(xr)`, para que el intervalo final se aprecie aunque sea muy
+pequeño. Si una asíntota produce valores enormes, la escala vertical se ajusta
+a la zona típica y se indica con un aviso.
