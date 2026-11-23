@@ -763,6 +763,16 @@ def ejecutar_pruebas():
         errores_num = calcular_errores(0, 0.25)
         probar("Error relativo indefinido cuando xv=0",
                errores_num["relativo"] is None and errores_num["porcentual"] is None)
+        from modulos.modulo_metodos_numericos import _numero_flotante
+        errores_fraccion = calcular_errores(_numero_flotante("1/3", "xv"), 0.333)
+        probar("xv acepta fracciones (1/3)",
+               abs(errores_fraccion["verdadero"] - 1 / 3) < 1e-15)
+        try:
+            _numero_flotante("1/0", "xv")
+            rechazo = False
+        except ValueError:
+            rechazo = True
+        probar("xv rechaza fracciones con denominador 0", rechazo)
         propagacion = propagacion_error(0.5, 0.001)
         probar("Propagación de error", propagacion["diferencia"] >= 0)
         flotante = diagnostico_punto_flotante()

@@ -28,6 +28,12 @@ no se utiliza `eval()` directamente con texto del usuario. SciPy aparece
 únicamente como contraste externo de la raíz: la bisección principal está
 programada en `modulos/modulo_metodos_numericos.py`.
 
+## Entradas numéricas
+
+Los campos numéricos (`a`, `b`, tolerancia, `x` mínimo/máximo, valor
+verdadero `xv`, valor aproximado `xa`, `x` y `Δx`) aceptan decimales
+(`0.333` o `0,333`) y fracciones exactas como `1/3`, `-2/5` o `2/4`.
+
 ## Funciones permitidas
 
 Se admite `x`, `pi`, `e`, `sin`, `cos`, `tan`, `exp`, `log`, `ln`, `sqrt`,
