@@ -7,6 +7,7 @@ para analizar expresiones con una lista blanca; SciPy solo contrasta la raíz.
 """
 
 from dataclasses import dataclass
+from fractions import Fraction
 import math
 import warnings
 
@@ -563,11 +564,21 @@ DEFINICIONES_ERRORES = (
 
 
 def _numero_flotante(texto, nombre):
-    """Convierte un texto a float aceptando coma decimal."""
+    """Convierte un texto a float aceptando coma decimal y fracciones como 1/3."""
+    crudo = str(texto).strip().replace(",", ".")
+    # Se toleran paréntesis y espacios: "(1/3)", "1 / 3", "-2/5".
+    while crudo.startswith("(") and crudo.endswith(")"):
+        crudo = crudo[1:-1].strip()
+    if "/" in crudo:
+        crudo = crudo.replace(" ", "")
     try:
-        valor = float(str(texto).strip().replace(",", "."))
-    except ValueError as error:
-        raise ValueError(nombre + " debe ser numérico.") from error
+        # Las fracciones (1/3, -2/5) se interpretan de forma exacta antes de
+        # pasarlas a punto flotante; el resto de entradas usa el formato decimal.
+        valor = float(Fraction(crudo)) if "/" in crudo else float(crudo)
+    except (ValueError, ZeroDivisionError, OverflowError) as error:
+        raise ValueError(
+            nombre + " debe ser numérico (admite fracciones como 1/3)."
+        ) from error
     if not math.isfinite(valor):
         raise ValueError(nombre + " debe ser finito.")
     return valor
@@ -1110,7 +1121,7 @@ def _menu_posicional():
 
 def _menu_errores():
     """Ejecuta cálculo de errores y propagación en consola."""
-    xv = _leer_float("   Valor verdadero xv = ")
+    xv = _leer_float("   Valor verdadero xv (admite 1/3) = ")
     xa = _leer_float("   Valor aproximado xa = ")
     x = _leer_float("   x para propagación = ")
     delta = _leer_float("   Δx = ")
