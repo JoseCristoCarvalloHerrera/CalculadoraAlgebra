@@ -63,10 +63,14 @@ from modulos.modulo_metodos_numericos import (
     calcular_errores, diagnostico_punto_flotante, parsear_funcion,
     preparar_datos_grafica, propagacion_error,
 )
+from modulos.modulo_newton import (
+    NewtonApp, newton_raphson, derivar, tabla_formateada, texto_resumen,
+    residuo_sospechoso, crear_figura_newton,
+)
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
 from modulos import (modulo_sistemas, modulo_vectores, modulo_matrices,
                      modulo_determinantes, modulo_lu, modulo_metodos_numericos,
-                     modulo_iterativos)
+                     modulo_iterativos, modulo_newton)
 from teoremas.resumen_teoremas import mostrar_teoremas
 from modulos.modulo_iterativos import IterativosApp
 
@@ -108,6 +112,7 @@ class MenuPrincipal:
             ("Factorización LU (Ax = b)", self.abrir_lu),
             ("Métodos Numéricos", self.abrir_numericos),
             ("Jacobi y Gauss-Seidel", self.abrir_iterativos),
+            ("Newton-Raphson (raíces)", self.abrir_newton),
         ]
         for texto, comando in botones:
             tk.Button(self.frame_menu, text=texto, font=("Montserrat", 13, "bold"),
@@ -151,6 +156,11 @@ class MenuPrincipal:
         """Abre el módulo de Jacobi y Gauss-Seidel del Programa 8."""
         self.frame_menu.pack_forget()
         IterativosApp(self.raiz, callback_volver=self.mostrar_menu)
+
+    def abrir_newton(self):
+        """Abre el módulo de Newton-Raphson del Programa 9."""
+        self.frame_menu.pack_forget()
+        NewtonApp(self.raiz, callback_volver=self.mostrar_menu)
 
     def mostrar_menu(self):
         for widget in self.raiz.winfo_children():
@@ -781,6 +791,86 @@ def ejecutar_pruebas():
     except Exception as error:
         probar("Errores numéricos", False, str(error))
 
+    # =================================================================
+    # PRUEBAS DEL MODULO 8: NEWTON-RAPHSON (PROGRAMA 9)
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DEL MODULO 8: NEWTON-RAPHSON")
+    print("--------------------------------")
+
+    try:
+        # Ejemplo 1 de la Sesion 22: converge en 4 iteraciones a 0.567143.
+        convergente = newton_raphson("exp(-x) - x", 0)
+        probar("Newton converge en el ejemplo de clase",
+               convergente.estado == "convergencia"
+               and len(convergente.iteraciones) == 4,
+               f"estado={convergente.estado} it={len(convergente.iteraciones)}")
+        probar("Raiz aproximada 0.567143",
+               abs(convergente.raiz - 0.5671432904) < 1e-9,
+               f"raiz={convergente.raiz}")
+        probar("El residuo |f(x)| queda practicamente en cero",
+               convergente.residuo < 1e-12 and not residuo_sospechoso(convergente),
+               f"residuo={convergente.residuo}")
+
+        # La derivada simbolica debe coincidir con la analitica.
+        derivada_cubica = derivar("x**3 - 2*x - 5")
+        probar("Derivada simbolica de x^3-2x-5 evaluada en 2 vale 10",
+               abs(derivada_cubica.evaluar(2) - 10) < 1e-12)
+
+        # Ejemplo 2 de la Sesion 22 (polinomio de grado 5).
+        polinomio = newton_raphson("x**5 - 4*x**4 + 5*x**3 - 6*x + 4", -1.25)
+        probar("Ejemplo del polinomio: 4 iteraciones hasta -1",
+               len(polinomio.iteraciones) == 4
+               and abs(polinomio.raiz + 1) < 1e-6,
+               f"raiz={polinomio.raiz} it={len(polinomio.iteraciones)}")
+
+        # Caso 2 obligatorio: derivada exactamente cero, parada controlada.
+        derivada_cero = newton_raphson("x**2 - 4", 0)
+        probar("Se detiene cuando f'(x) = 0",
+               derivada_cero.estado == "derivada_nula"
+               and len(derivada_cero.iteraciones) == 1)
+        probar("La fila de la derivada nula no inventa x(i+1)",
+               derivada_cero.iteraciones[0].x_siguiente is None)
+
+        # Caso 3 obligatorio: oscilacion 0, 1, 0, 1 ... sin converger.
+        oscilante = newton_raphson("x**3 - 2*x + 2", 0, max_iteraciones=10)
+        probar("Avisa cuando no alcanza el criterio de parada",
+               oscilante.estado == "max_iteraciones"
+               and len(oscilante.iteraciones) == 10)
+        probar("El error relativo es None cuando x(i+1) = 0",
+               oscilante.iteraciones[1].error_relativo is None)
+
+        # Caso 4 complementario: derivada muy pequena, 42 iteraciones.
+        lento = newton_raphson("x**10 - 1", 0.5, max_iteraciones=60)
+        probar("Derivada muy pequena: converge pero en 42 iteraciones",
+               lento.estado == "convergencia"
+               and len(lento.iteraciones) == 42,
+               f"it={len(lento.iteraciones)}")
+
+        # La tabla debe traer las siete columnas y la notacion de clase.
+        tabla = tabla_formateada(convergente)
+        probar("La tabla tiene las 7 columnas de la Sesion 22",
+               list(tabla.columns) == ["i", "x_i", "f(x_i)", "f'(x_i)",
+                                       "x_(i+1)", "ea", "ea (%)"])
+        probar("Los errores chicos salen como 8.32 x 10^-4",
+               "8.32 \u00d7 10\u207b\u2074" in tabla.iloc[2]["ea"],
+               f"celda={tabla.iloc[2]['ea']}")
+
+        # El resumen no debe llamar "raiz" a un proceso que se corto.
+        resumen_cortado = texto_resumen(derivada_cero)
+        probar("No etiqueta como raiz una corrida detenida",
+               "Ultima aproximacion" in resumen_cortado
+               or "\u00daltima aproximaci\u00f3n" in resumen_cortado)
+
+        # La grafica debe dibujar una tangente por iteracion util.
+        figura = crear_figura_newton(convergente)
+        tangentes = [linea for linea in figura.axes[0].lines
+                     if linea.get_linestyle() == "--"]
+        probar("La grafica dibuja las rectas tangentes",
+               len(tangentes) == 4, f"tangentes={len(tangentes)}")
+    except Exception as error:
+        probar("Newton-Raphson", False, str(error))
+
     print("=" * 64)
     if fallos == 0:
         print("¡Excelente! Todas las comprobaciones pasaron correctamente.")
@@ -822,7 +912,9 @@ def menu_consola():
         print("   5. Factorización LU y solución A·x = b")
         print("   6. Métodos Numéricos")
         print("   7. Jacobi y Gauss-Seidel")
-        print("   8. Ejecutar las pruebas automáticas")
+        print("   8. Método de Newton-Raphson (raíces)")
+        print()
+        print("   0. Ejecutar las pruebas automáticas")
         print("   9. Salir")
         print()
         opcion = preguntar("   Elegí una opción: ").strip()
@@ -847,6 +939,8 @@ def menu_consola():
         elif opcion == "7":
             modulo_iterativos.menu_consola()
         elif opcion == "8":
+            modulo_newton.menu_consola()
+        elif opcion == "0":
             limpiar_pantalla()
             ejecutar_pruebas()
             pausa()

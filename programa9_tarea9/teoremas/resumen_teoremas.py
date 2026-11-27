@@ -300,6 +300,61 @@ TEOREMAS = {
    La representacion binaria de algunos decimales no es exacta. Por eso
    aparecen errores de redondeo, truncamiento, overflow, underflow y error
    del modelo, que deben distinguirse al interpretar los resultados.""",
+
+
+    "newton": """TEOREMAS CLAVE - MODULO 8: METODO DE NEWTON-RAPHSON
+
+1. METODOS CERRADOS VS. METODOS ABIERTOS
+   Cerrados (biseccion): la raiz queda acotada por un intervalo con cambio
+   de signo y la convergencia esta garantizada, pero es lenta.
+   Abiertos (Newton-Raphson): parten de UN solo valor inicial x0, no
+   necesitan encerrar la raiz y convergen rapido, pero pueden divergir,
+   oscilar o irse a otra raiz.
+
+2. DE LA TANGENTE A LA FORMULA
+   Recta tangente en x(i):   y = f(x(i)) + f'(x(i))*(x - x(i))
+   Se busca su corte con el eje x, o sea y = 0:
+       0 = f(x(i)) + f'(x(i))*(x(i+1) - x(i))
+   Despejando se obtiene la formula de Newton-Raphson:
+       x(i+1) = x(i) - f(x(i)) / f'(x(i))
+   Condicion practica: f'(x(i)) != 0. Si la derivada es cero o muy
+   pequena, el paso no se puede calcular o resulta excesivamente grande.
+
+3. ERRORES Y CRITERIO DE PARADA
+   Error aproximado absoluto:   ea = |x(i+1) - x(i)|
+   Error aproximado relativo:   ea(%) = |(x(i+1) - x(i)) / x(i+1)| * 100
+                                 (solo si x(i+1) != 0)
+   Tolerancia (criterio de paro): se itera hasta que ea < tolerancia o
+   hasta alcanzar el maximo de iteraciones.
+   Residuo: r = |f(x_aprox)|. NO es el error de la raiz; mide que tan
+   cerca de cero quedo la funcion.
+
+4. POR QUE SE INFORMA EL RESIDUO
+   Una convergencia lenta u oscilatoria puede dar un ea pequeno mientras
+   la aproximacion sigue lejos de una raiz. Por eso siempre se sustituye
+   la aproximacion final en la funcion original y se informa |f(x)|.
+
+5. CONVERGENCIA
+   Para una raiz simple y un x0 suficientemente cercano, la convergencia
+   es CUADRATICA (orden p = 2):   |E(i+1)| ~ C * |E(i)|^2
+   En raices multiples de multiplicidad m la convergencia baja a lineal
+   con constante (m-1)/m. Comparacion de ordenes:
+       Biseccion 1 (C = 1/2) | Secante ~1.618 | Newton raiz simple 2
+
+6. CASOS DE ERROR Y DIVERGENCIA
+   Divergencia: una tangente casi plana lanza la iteracion lejos.
+   Oscilacion: x^3 - 2x + 2 con x0 = 0 repite 0, 1, 0, 1, ...
+   Derivada pequena: x^10 - 1 con x0 = 0.5 necesita 42 iteraciones.
+   Newton es rapido DENTRO de su region de convergencia; no duplica
+   cifras en toda iteracion ni converge desde cualquier punto.
+
+7. DERIVADA NUMERICA (alternativa cuando f' es dificil)
+   Adelante:  f'(x) ~ [f(x+h) - f(x)] / h          error O(h)
+   Atras:     f'(x) ~ [f(x) - f(x-h)] / h          error O(h)
+   Central:   f'(x) ~ [f(x+h) - f(x-h)] / (2h)     error O(h^2)
+   Reducir h disminuye el truncamiento, pero un h demasiado pequeno
+   amplifica el redondeo. En este programa f'(x) se obtiene de forma
+   SIMBOLICA con SymPy, que no tiene error de truncamiento.""",
 }
 
 
