@@ -569,7 +569,214 @@ def guardar_figura(resultado, ruta, **opciones):
 
 
 # =====================================================================
-# BLOQUE 6: INTERFAZ GRÁFICA DEL MÓDULO (Tkinter)
+# BLOQUE 6: PROCEDIMIENTO PASO A PASO (el desarrollo escrito a mano)
+# =====================================================================
+
+def _numero_escrito(valor, decimales=6):
+    """Escribe un número para sustituirlo dentro de la función.
+
+    Los negativos van entre paréntesis, como se hace en papel:
+    f(-1.25) = (-1.250000)**5 - ... y no -1.250000**5.
+    """
+    texto = "{:.{d}f}".format(valor, d=decimales)
+    return "(" + texto + ")" if valor < 0 else texto
+
+
+def _sustituir_x(texto, valor, decimales=6):
+    """Reescribe la función cambiando la x por el número.
+
+    Se recorre carácter por carácter en lugar de usar replace() para no
+    tocar la x que forma parte de otros nombres, como la de 'exp'. Así
+    el desarrollo conserva el ORDEN en que se escribió la función, que
+    es como aparece en la pizarra.
+    """
+    numero = _numero_escrito(valor, decimales)
+    partes = []
+    palabra = ""
+    for caracter in str(texto):
+        if caracter.isalnum() or caracter == "_":
+            palabra += caracter
+            continue
+        partes.append(numero if palabra == "x" else palabra)
+        partes.append(caracter)
+        palabra = ""
+    partes.append(numero if palabra == "x" else palabra)
+    return "".join(partes)
+
+
+def _lineas_funciones_internas(expresion, valor, decimales=6):
+    """Evalúa aparte cada exp, sin, log... como hace el profesor.
+
+    En la Sesión 22 el primer paso de cada iteración es 'evaluar la
+    exponencial'; esto hace lo mismo para cualquier función elemental
+    que aparezca en f(x).
+    """
+    lineas = []
+    for nodo in sorted(expresion.atoms(sp.Function), key=sp.default_sort_key):
+        escrito = _sustituir_x(sp.sstr(nodo), valor, decimales)
+        lineas.append((escrito, float(nodo.subs(_X, valor))))
+    return lineas
+
+
+def _linea_terminos(expresion, texto, valor, decimales=6):
+    """Arma la línea intermedia: '1.000000 - 0.000000'.
+
+    Si la función tiene exponenciales o trigonométricas, se reemplaza
+    cada una por su valor dentro de la expresión ya sustituida, para
+    respetar el orden escrito. Si es un polinomio, se evalúa término a
+    término, que es como se desarrolla en papel: 8 - 4 - 5.
+    """
+    escrita = _sustituir_x(texto, valor, decimales)
+    internas = _lineas_funciones_internas(expresion, valor, decimales)
+    if internas:
+        for texto_interno, valor_interno in internas:
+            escrita = escrita.replace(texto_interno,
+                                      _celda(valor_interno, decimales))
+        return escrita
+    partes = [_celda(float(termino.subs(_X, valor)), decimales)
+              for termino in expresion.as_ordered_terms()]
+    return " + ".join(partes).replace("+ -", "- ")
+
+
+def _pasos_evaluacion(expresion, texto, valor, nombre, resultado_valor,
+                      decimales=6):
+    """Las tres líneas con que se evalúa f(x_i) o f'(x_i) en el cuaderno.
+
+    Se sustituye sobre el TEXTO de la función, no sobre el árbol de
+    SymPy, porque SymPy reordena los términos: la función queda escrita
+    en el mismo orden en que la escribió el usuario.
+    """
+    argumento = _numero_escrito(valor, decimales)
+    lineas = ["   " + nombre + "(" + argumento + ") = "
+              + _sustituir_x(texto, valor, decimales)]
+    for texto_interno, valor_interno in _lineas_funciones_internas(
+            expresion, valor, decimales):
+        lineas.append("   " + texto_interno + " = "
+                      + _celda(valor_interno, decimales))
+    lineas.append("   " + nombre + "(" + argumento + ") = "
+                  + _linea_terminos(expresion, texto, valor, decimales)
+                  + " = " + _celda(resultado_valor, decimales))
+    return lineas
+
+
+def _pasos_una_iteracion(resultado, iteracion, decimales=6):
+    """El desarrollo completo de UNA iteración, con los 6 pasos de clase."""
+    funcion = resultado.funcion.expresion
+    derivada = resultado.derivada.expresion
+    texto_funcion = resultado.funcion.texto
+    texto_derivada = resultado.derivada.texto
+    lineas = ["=" * 66,
+              "ITERACIÓN " + str(iteracion.i) + ":   x_i = "
+              + _celda(iteracion.x_i, decimales),
+              "=" * 66, "",
+              "1) Evaluar f(x_i)"]
+    lineas += _pasos_evaluacion(funcion, texto_funcion, iteracion.x_i, "f",
+                                iteracion.f_xi, decimales)
+    lineas += ["", "2) Evaluar f'(x_i)"]
+    lineas += _pasos_evaluacion(derivada, texto_derivada, iteracion.x_i,
+                                "f'", iteracion.df_xi, decimales)
+
+    # Paso 3: la validación que el profesor menciona pero no desarrolla.
+    lineas += ["", "3) Verificar que se puede dividir"]
+    if iteracion.x_siguiente is None:
+        lineas += ["   |f'(x_i)| = " + _celda(abs(iteracion.df_xi), decimales)
+                   + "  ≤  " + "{:g}".format(DERIVADA_MINIMA),
+                   "   La derivada es cero o está demasiado cerca de cero:",
+                   "   la fórmula dividiría entre cero. El proceso se detiene.", ""]
+        return lineas
+    lineas.append("   |f'(x_i)| = " + _celda(abs(iteracion.df_xi), decimales)
+                  + "  >  " + "{:g}".format(DERIVADA_MINIMA)
+                  + "   →  se puede aplicar la fórmula")
+
+    lineas += ["", "4) Aplicar la fórmula de Newton-Raphson",
+               "   x_(i+1) = x_i - f(x_i) / f'(x_i)",
+               "   x_(i+1) = " + _celda(iteracion.x_i, decimales)
+               + " - (" + _celda(iteracion.f_xi, decimales)
+               + ") / (" + _celda(iteracion.df_xi, decimales) + ")",
+               "   x_(i+1) = " + _celda(iteracion.x_i, decimales)
+               + " - (" + _celda(iteracion.f_xi / iteracion.df_xi, decimales)
+               + ") = " + _celda(iteracion.x_siguiente, decimales)]
+
+    lineas += ["", "5) Error aproximado",
+               "   ea    = |x_(i+1) - x_i| = |"
+               + _celda(iteracion.x_siguiente, decimales) + " - "
+               + _celda(iteracion.x_i, decimales) + "| = "
+               + _celda(iteracion.error_absoluto, decimales, es_error=True)]
+    if iteracion.error_relativo is None:
+        lineas.append("   ea(%) no se calcula: x_(i+1) = 0 y la fórmula "
+                      "dividiría entre cero.")
+    else:
+        lineas.append("   ea(%) = |(" + _celda(iteracion.x_siguiente, decimales)
+                      + " - " + _celda(iteracion.x_i, decimales) + ") / "
+                      + _celda(iteracion.x_siguiente, decimales) + "| × 100 = "
+                      + _celda(iteracion.error_relativo, decimales, es_error=True)
+                      + " %")
+
+    # Paso 6: la comparación explícita con la tolerancia, como en clase.
+    if resultado.criterio == "relativo" and iteracion.error_relativo is not None:
+        usado, simbolo = iteracion.error_relativo, "ea(%)"
+    else:
+        usado, simbolo = iteracion.error_absoluto, "ea"
+    lineas += ["", "6) ¿Detener?"]
+    if usado is not None and usado < resultado.tolerancia:
+        lineas += ["   " + simbolo + " = " + _celda(usado, decimales, es_error=True)
+                   + "  <  " + "{:g}".format(resultado.tolerancia)
+                   + "   →  SÍ, se cumple el criterio",
+                   "   Raíz aproximada: x ≈ "
+                   + _celda(iteracion.x_siguiente, decimales + 4)]
+    else:
+        lineas += ["   " + simbolo + " = " + _celda(usado, decimales, es_error=True)
+                   + "  >  " + "{:g}".format(resultado.tolerancia)
+                   + "   →  NO, continuar con x_i = "
+                   + _celda(iteracion.x_siguiente, decimales)]
+    lineas.append("")
+    return lineas
+
+
+def pasos_procedimiento(resultado, decimales=6):
+    """Devuelve el desarrollo completo del método, línea por línea.
+
+    Reproduce el procedimiento que se escribe a mano: datos, y por cada
+    iteración los seis pasos de la Sesión 22 (evaluar f, evaluar f',
+    verificar la derivada, aplicar la fórmula, calcular el error y
+    decidir si se detiene), más la comprobación final del residuo.
+    """
+    criterio = ("error relativo porcentual" if resultado.criterio == "relativo"
+                else "error absoluto")
+    lineas = ["DATOS",
+              "   f(x)  = " + resultado.funcion.texto,
+              "   f'(x) = " + resultado.derivada.texto
+              + "      (derivada analítica obtenida con SymPy)",
+              "   x0 = " + _celda(resultado.x0, decimales)
+              + "      tolerancia = " + "{:g}".format(resultado.tolerancia)
+              + "      criterio: " + criterio,
+              ""]
+    for iteracion in resultado.iteraciones:
+        lineas += _pasos_una_iteracion(resultado, iteracion, decimales)
+
+    lineas += ["=" * 66, "COMPROBACIÓN FINAL", "=" * 66, "",
+               "   Se sustituye la aproximación en la función ORIGINAL:"]
+    if resultado.raiz is None or resultado.residuo is None:
+        lineas.append("   No hay aproximación que comprobar.")
+        return lineas
+    lineas += _pasos_evaluacion(resultado.funcion.expresion,
+                                resultado.funcion.texto, resultado.raiz, "f",
+                                float(resultado.funcion.evaluar(resultado.raiz)),
+                                decimales)
+    lineas += ["   Residuo = |f(x)| = "
+               + _celda(resultado.residuo, decimales, es_error=True), ""]
+    if resultado.residuo < 1e-6:
+        lineas.append("   El residuo se acerca a cero: la aproximación está "
+                      "sobre una raíz.")
+    else:
+        lineas.append("   El residuo NO se acerca a cero: la aproximación no "
+                      "está sobre una raíz.")
+    lineas.append("   " + resultado.mensaje)
+    return lineas
+
+
+# =====================================================================
+# BLOQUE 7: INTERFAZ GRÁFICA DEL MÓDULO (Tkinter)
 # =====================================================================
 
 class NewtonApp:
@@ -579,6 +786,8 @@ class NewtonApp:
         self.raiz = raiz
         self.callback_volver = callback_volver
         self.ultimo = None            # último ResultadoNewton calculado
+        self.mostrando_procedimiento = False
+        self.filas_tabla = 0
 
         self.fuente_titulo = tkfont.Font(family="Montserrat", size=21, weight="bold")
         self.fuente_body = tkfont.Font(family="Montserrat", size=10)
@@ -624,11 +833,11 @@ class NewtonApp:
                  ).pack(anchor="w", padx=28, pady=(0, 8))
 
         self._construir_entrada()
-        self._construir_resumen()
-        self._construir_tabla()
+        self._construir_datos()
+        self._construir_procedimiento()
 
-    def _entrada(self, padre, texto, fila, columna, valor=""):
-        """Etiqueta + casilla de texto, con los colores fijados a mano.
+    def _campo(self, padre, texto, fila, columna, valor="", ancho=16):
+        """Etiqueta + casilla de ancho fijo, para que la tarjeta no se estire.
 
         Los colores se escriben explícitamente porque si no Tkinter los
         hereda del sistema y, con Windows en modo oscuro, la letra sale
@@ -636,111 +845,127 @@ class NewtonApp:
         """
         tk.Label(padre, text=texto, bg=TARJETA, fg=TEXTO,
                  font=self.fuente_body).grid(row=fila, column=columna,
-                                             sticky="w", padx=8, pady=8)
-        casilla = tk.Entry(padre, width=18, font=self.fuente_body,
+                                             sticky="w", padx=(0, 8), pady=6)
+        casilla = tk.Entry(padre, width=ancho, font=(LETRA_MONO, 10),
                            relief="solid", bd=1, highlightthickness=1,
                            highlightcolor="#90E0EF", bg="#FFFFFF", fg=TEXTO,
                            insertbackground=TEXTO, selectbackground="#CAF0F8",
                            selectforeground=TEXTO)
         casilla.insert(0, valor)
-        casilla.grid(row=fila, column=columna + 1, sticky="ew", padx=8, pady=8)
+        casilla.grid(row=fila, column=columna + 1, sticky="w",
+                     padx=(0, 26), pady=6)
         return casilla
 
     def _construir_entrada(self):
-        """Tarjeta con f(x), x0, tolerancia, máximo de iteraciones y criterio."""
+        """Tarjeta compacta: f(x), x0, tolerancia, máximo y criterio."""
         tarjeta = tk.Frame(self.marco, bg=TARJETA,
                            highlightbackground="#C9E3ED", highlightthickness=1)
-        tarjeta.pack(fill="x", padx=35, pady=(6, 12))
+        tarjeta.pack(fill="x", padx=35, pady=(4, 10))
+        cuerpo = tk.Frame(tarjeta, bg=TARJETA)
+        # anchor="w": los campos se quedan a la izquierda en vez de
+        # estirarse hasta el borde de la ventana.
+        cuerpo.pack(anchor="w", padx=16, pady=(12, 4))
 
-        self.campo_funcion = self._entrada(tarjeta, "f(x):", 0, 0, "exp(-x) - x")
-        self.campo_x0 = self._entrada(tarjeta, "Valor inicial x0:", 1, 0, "0")
-        self.campo_tolerancia = self._entrada(
-            tarjeta, "Tolerancia:", 1, 2, str(TOLERANCIA_POR_DEFECTO))
-        self.campo_maximo = self._entrada(
-            tarjeta, "Máximo de iteraciones:", 2, 0,
-            str(MAX_ITERACIONES_POR_DEFECTO))
-
-        tk.Label(tarjeta, text="Criterio de parada:", bg=TARJETA, fg=TEXTO,
-                 font=self.fuente_body).grid(row=2, column=2, sticky="w",
-                                             padx=8, pady=8)
+        self.campo_funcion = self._campo(cuerpo, "f(x):", 0, 0,
+                                         "exp(-x) - x", ancho=30)
+        self.campo_x0 = self._campo(cuerpo, "Valor inicial x0:", 0, 2, "0",
+                                    ancho=12)
+        self.campo_tolerancia = self._campo(cuerpo, "Tolerancia:", 1, 0,
+                                            str(TOLERANCIA_POR_DEFECTO),
+                                            ancho=12)
+        self.campo_maximo = self._campo(cuerpo, "Máximo de iteraciones:", 1, 2,
+                                        str(MAX_ITERACIONES_POR_DEFECTO),
+                                        ancho=12)
+        tk.Label(cuerpo, text="Criterio de parada:", bg=TARJETA, fg=TEXTO,
+                 font=self.fuente_body).grid(row=1, column=4, sticky="w",
+                                             padx=(0, 8), pady=6)
         self.variable_criterio = tk.StringVar(value="absoluto")
-        ttk.Combobox(tarjeta, textvariable=self.variable_criterio, width=16,
+        ttk.Combobox(cuerpo, textvariable=self.variable_criterio, width=12,
                      state="readonly", font=self.fuente_body,
                      values=("absoluto", "relativo")
-                     ).grid(row=2, column=3, sticky="ew", padx=8, pady=8)
-
-        tarjeta.columnconfigure(1, weight=1)
-        tarjeta.columnconfigure(3, weight=1)
+                     ).grid(row=1, column=5, sticky="w", pady=6)
 
         # Los valores predeterminados quedan a la vista, como pide el enunciado.
         tk.Label(tarjeta,
-                 text="Predeterminados: tolerancia " + str(TOLERANCIA_POR_DEFECTO)
-                      + ", máximo " + str(MAX_ITERACIONES_POR_DEFECTO)
+                 text="Predeterminados: tolerancia "
+                      + str(TOLERANCIA_POR_DEFECTO) + ", máximo "
+                      + str(MAX_ITERACIONES_POR_DEFECTO)
                       + " iteraciones, criterio por error absoluto "
-                      "|x(i+1) - x(i)|. Use ** para potencias.",
+                      "|x(i+1) - x(i)|.   Use ** para potencias.",
                  bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuente_body,
-                 wraplength=760, justify="left"
-                 ).grid(row=3, column=0, columnspan=4, sticky="w", padx=8)
+                 anchor="w").pack(fill="x", padx=16)
 
         botones = tk.Frame(tarjeta, bg=TARJETA)
-        botones.grid(row=4, column=0, columnspan=4, pady=10)
+        botones.pack(anchor="w", padx=16, pady=(8, 12))
         tk.Button(botones, text="Ejecutar Newton-Raphson",
                   font=self.fuente_boton, bg=ACENTO, fg=FONDO, relief="flat",
-                  padx=12, pady=8, cursor="hand2",
-                  command=self._ejecutar).pack(side="left", padx=6)
+                  padx=14, pady=7, cursor="hand2",
+                  command=self._ejecutar).pack(side="left", padx=(0, 8))
         tk.Button(botones, text="Ver gráfica", font=self.fuente_boton,
-                  bg=BOTON_SEC, fg=TEXTO, relief="flat", padx=12, pady=8,
+                  bg=BOTON_SEC, fg=TEXTO, relief="flat", padx=14, pady=7,
                   cursor="hand2", command=self._ver_grafica
-                  ).pack(side="left", padx=6)
+                  ).pack(side="left", padx=8)
+        self.boton_procedimiento = tk.Button(
+            botones, text="Ver procedimiento", font=self.fuente_boton,
+            bg=FONDO, fg=ACENTO, relief="solid", bd=1, padx=14, pady=6,
+            cursor="hand2", command=self._alternar_procedimiento)
+        self.boton_procedimiento.pack(side="left", padx=8)
 
-    def _construir_resumen(self):
-        """Recuadro de texto con el resumen final del proceso."""
-        self.texto_resumen = tk.Text(self.marco, height=9, wrap="word",
-                                     font=(LETRA_MONO, 10), bg=TARJETA,
-                                     fg=TEXTO, relief="solid", bd=1)
-        self.texto_resumen.pack(fill="x", padx=35, pady=(0, 10), ipady=6)
-        self.texto_resumen.insert("1.0",
-                                  "Ingrese f(x) y el valor inicial x0, y presione "
-                                  "«Ejecutar Newton-Raphson».")
-        self.texto_resumen.configure(state="disabled")
+    def _construir_datos(self):
+        """Resumen a la izquierda y tabla a la derecha, en una sola franja.
 
-    def _construir_tabla(self):
-        """Tabla de iteraciones con las columnas de la Sesión 22."""
-        tk.Label(self.marco,
-                 text="Cada fila guarda los valores ANTES de avanzar: por eso "
-                      "x(i+1) de una fila es x(i) de la siguiente.",
-                 bg=FONDO, fg=TEXTO_SUAVE, font=self.fuente_body
-                 ).pack(anchor="w", padx=38)
+        Antes iban uno debajo del otro, cada uno a todo el ancho, y al
+        lado del resumen quedaba un bloque vacío. Así la tabla aprovecha
+        ese espacio y queda más altura libre para el procedimiento.
+        """
+        self.fila_datos = tk.Frame(self.marco, bg=FONDO)
+        self.fila_datos.pack(fill="x", padx=35, pady=(0, 10))
 
-        marco_tabla = tk.Frame(self.marco, bg=TARJETA,
+        # ---------- resumen: a la izquierda, del ancho de sus datos ----------
+        self.marco_resumen = tk.Frame(self.fila_datos, bg=TARJETA,
+                                      highlightbackground="#C9E3ED",
+                                      highlightthickness=1)
+        self.marco_resumen.pack(side="left", anchor="n")
+        self.cuerpo_resumen = tk.Frame(self.marco_resumen, bg=TARJETA)
+        self.cuerpo_resumen.pack(anchor="w", padx=14, pady=10)
+        tk.Label(self.cuerpo_resumen,
+                 text="Ingrese f(x) y el valor inicial x0,\ny presione "
+                      "«Ejecutar Newton-Raphson».",
+                 bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuente_body,
+                 justify="left").pack()
+
+        # ---------- tabla: a la derecha, con el resto del ancho ----------
+        marco_tabla = tk.Frame(self.fila_datos, bg=TARJETA,
                                highlightbackground="#C9E3ED",
                                highlightthickness=1)
-        marco_tabla.pack(fill="both", expand=True, padx=35, pady=(2, 25))
+        marco_tabla.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        tk.Label(marco_tabla,
+                 text="Cada fila guarda los valores ANTES de avanzar: x(i+1) "
+                      "de una fila es x(i) de la siguiente.",
+                 bg=TARJETA, fg=TEXTO_SUAVE, font=self.fuente_body,
+                 anchor="w").pack(fill="x", padx=10, pady=(8, 4))
+
         cuerpo = tk.Frame(marco_tabla, bg=TARJETA)
-        cuerpo.pack(fill="both", expand=True, padx=12, pady=(12, 0))
-        cuerpo.rowconfigure(0, weight=1)
+        cuerpo.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         cuerpo.columnconfigure(0, weight=1)
+        cuerpo.rowconfigure(0, weight=1)
 
         self.tabla = ttk.Treeview(cuerpo, columns=tuple(ENCABEZADOS),
-                                  show="headings", height=10,
+                                  show="headings", height=4,
                                   style="Newton.Treeview")
         self.tabla.tag_configure("fila_par", background="#F1F8FB")
         self.tabla.tag_configure("fila_impar", background=TARJETA)
-        anchos = {"i": 50, "x_i": 140, "f(x_i)": 140, "f'(x_i)": 140,
-                  "x_(i+1)": 140, "ea": 130, "ea (%)": 130}
         for columna in ENCABEZADOS:
             self.tabla.heading(columna, text=columna)
-            self.tabla.column(columna, width=anchos[columna], minwidth=50,
-                              anchor="center", stretch=False)
-        barra_v = ttk.Scrollbar(cuerpo, orient="vertical",
-                                command=self.tabla.yview)
-        barra_h = ttk.Scrollbar(marco_tabla, orient="horizontal",
-                                command=self.tabla.xview)
-        self.tabla.configure(yscrollcommand=barra_v.set,
-                             xscrollcommand=barra_h.set)
+            # stretch=True reparte el ancho sobrante entre las columnas en
+            # vez de dejar un bloque blanco a la derecha.
+            self.tabla.column(columna, width=50 if columna == "i" else 120,
+                              minwidth=46, anchor="center", stretch=True)
+        self.barra_tabla = ttk.Scrollbar(cuerpo, orient="vertical",
+                                         command=self.tabla.yview)
+        self.tabla.configure(yscrollcommand=self.barra_tabla.set)
         self.tabla.grid(row=0, column=0, sticky="nsew")
-        barra_v.grid(row=0, column=1, sticky="ns")
-        barra_h.pack(side="bottom", fill="x", padx=12, pady=(8, 12))
+
 
     # ---------- acciones ----------
     def _leer_datos(self):
@@ -767,6 +992,7 @@ class NewtonApp:
         self.ultimo = resultado
         self._mostrar_resumen(resultado)
         self._llenar_tabla(resultado)
+        self._llenar_procedimiento(resultado)
 
     # Un color de fondo por estado, para que se vea de lejos cómo terminó.
     COLORES_ESTADO = {
@@ -777,23 +1003,109 @@ class NewtonApp:
     }
 
     def _mostrar_resumen(self, resultado):
-        self.texto_resumen.configure(state="normal")
-        self.texto_resumen.delete("1.0", "end")
-        self.texto_resumen.insert("1.0", texto_resumen(resultado))
-        self.texto_resumen.configure(
-            state="disabled",
-            bg=self.COLORES_ESTADO.get(resultado.estado, TARJETA))
+        """Dibuja el resumen como pares etiqueta / valor, sin recortes."""
+        color = self.COLORES_ESTADO.get(resultado.estado, TARJETA)
+        self.marco_resumen.configure(bg=color)
+        self.cuerpo_resumen.configure(bg=color)
+        for hijo in self.cuerpo_resumen.winfo_children():
+            hijo.destroy()
+        for fila, (etiqueta, valor) in enumerate(resumen(resultado)):
+            tk.Label(self.cuerpo_resumen, text=etiqueta, bg=color,
+                     fg=TEXTO_SUAVE, font=self.fuente_body, anchor="w"
+                     ).grid(row=fila, column=0, sticky="w", padx=(0, 20))
+            tk.Label(self.cuerpo_resumen, text=str(valor), bg=color, fg=TEXTO,
+                     font=(LETRA_MONO, 10), anchor="w", justify="left",
+                     wraplength=1000).grid(row=fila, column=1, sticky="w")
 
     def _llenar_tabla(self, resultado):
         for elemento in self.tabla.get_children():
             self.tabla.delete(elemento)
         tabla = tabla_formateada(resultado)
+        self.filas_tabla = len(tabla.index)
+        self._ajustar_alto_tabla()
         for indice, fila in tabla.iterrows():
             self.tabla.insert("", "end",
                               tags=("fila_par" if indice % 2 == 0
                                     else "fila_impar",),
                               values=tuple(fila[columna]
                                            for columna in ENCABEZADOS))
+
+    def _ajustar_alto_tabla(self):
+        """La tabla mide lo que midan sus filas.
+
+        Con el procedimiento abierto se limita a 4 filas con barra, para
+        cederle la pantalla al desarrollo; cerrado llega hasta 14.
+        """
+        tope = 4 if self.mostrando_procedimiento else 14
+        self.tabla.configure(height=max(3, min(self.filas_tabla or 3, tope)))
+        if self.filas_tabla > tope:
+            self.barra_tabla.grid(row=0, column=1, sticky="ns")
+        else:
+            self.barra_tabla.grid_remove()
+
+    def _construir_procedimiento(self):
+        """Panel desplegable con el desarrollo paso a paso.
+
+        Nace oculto y se muestra con el botón; cuando está abierto se
+        queda con todo el espacio que sobra debajo de la tabla.
+        """
+        self.marco_procedimiento = tk.Frame(
+            self.marco, bg=TARJETA, highlightbackground="#C9E3ED",
+            highlightthickness=1)
+
+        cabecera = tk.Frame(self.marco_procedimiento, bg="#CAF0F8")
+        cabecera.pack(fill="x")
+        tk.Label(cabecera, text="Procedimiento paso a paso", bg="#CAF0F8",
+                 fg=TEXTO, font=("Montserrat", 10, "bold")
+                 ).pack(side="left", padx=12, pady=6)
+        self.etiqueta_procedimiento = tk.Label(
+            cabecera, text="", bg="#CAF0F8", fg=TEXTO_SUAVE,
+            font=self.fuente_body)
+        self.etiqueta_procedimiento.pack(side="right", padx=12)
+
+        cuerpo = tk.Frame(self.marco_procedimiento, bg=TARJETA)
+        cuerpo.pack(fill="both", expand=True)
+        barra = ttk.Scrollbar(cuerpo, orient="vertical")
+        self.texto_procedimiento = tk.Text(
+            cuerpo, wrap="none", height=24, font=(LETRA_MONO, 10),
+            bg=TARJETA, fg=TEXTO, relief="flat", spacing1=1,
+            yscrollcommand=barra.set)
+        barra.configure(command=self.texto_procedimiento.yview)
+        barra.pack(side="right", fill="y")
+        self.texto_procedimiento.pack(side="left", fill="both", expand=True,
+                                      padx=(10, 0), pady=8)
+        self.texto_procedimiento.configure(state="disabled")
+
+    def _llenar_procedimiento(self, resultado):
+        """Vuelca el desarrollo completo dentro del panel."""
+        self.texto_procedimiento.configure(state="normal")
+        self.texto_procedimiento.delete("1.0", "end")
+        self.texto_procedimiento.insert(
+            "1.0", "\n".join(pasos_procedimiento(resultado)))
+        # Que se vea desde la primera iteración y no desde el final.
+        self.texto_procedimiento.see("1.0")
+        self.texto_procedimiento.configure(state="disabled")
+        self.etiqueta_procedimiento.configure(
+            text="desarrollo completo de " + str(len(resultado.iteraciones))
+                 + " iteración(es)")
+
+    def _alternar_procedimiento(self):
+        """Muestra u oculta el panel del procedimiento."""
+        if self.ultimo is None:
+            messagebox.showinfo(
+                "Sin datos",
+                "Primero ejecute el método para tener un procedimiento.",
+                parent=self.raiz)
+            return
+        if self.mostrando_procedimiento:
+            self.marco_procedimiento.pack_forget()
+            self.boton_procedimiento.configure(text="Ver procedimiento")
+        else:
+            self.marco_procedimiento.pack(fill="both", expand=True,
+                                          padx=35, pady=(0, 25))
+            self.boton_procedimiento.configure(text="Ocultar procedimiento")
+        self.mostrando_procedimiento = not self.mostrando_procedimiento
+        self._ajustar_alto_tabla()
 
     def _ver_grafica(self):
         """Abre la gráfica en una ventana aparte, con opción de guardarla."""
@@ -842,7 +1154,7 @@ class NewtonApp:
 
 
 # =====================================================================
-# BLOQUE 7: MENÚ DE CONSOLA DEL MÓDULO (MODO CLI)
+# BLOQUE 8: MENÚ DE CONSOLA DEL MÓDULO (MODO CLI)
 # =====================================================================
 
 def _leer_funcion_consola():
@@ -894,6 +1206,12 @@ def _consola_newton():
         print()
         for linea in texto_resumen(resultado).split("\n"):
             print("   " + linea)
+        print()
+        ver = preguntar("   ¿Ver el procedimiento paso a paso? (s/n): ").strip()
+        if ver.lower().startswith("s"):
+            print()
+            for linea in pasos_procedimiento(resultado):
+                print("   " + linea)
     except (ValueError, ErrorFuncion) as error:
         print("\n   " + str(error))
     pausa()
