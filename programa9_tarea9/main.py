@@ -1,0 +1,1064 @@
+# -*- coding: utf-8 -*-
+"""
+Calculadora de Álgebra Lineal - Programa 7 - Grupo #2.
+
+Punto de entrada del proyecto integrador. Abre el menú principal en
+ventana (Tkinter) o en consola, y desde ahí se llega a los cinco
+módulos: sistemas de ecuaciones, vectores e independencia lineal,
+álgebra de matrices con determinantes e inversa, determinantes,
+factorización LU y métodos numéricos.
+
+Temas de clase: Sesiones 1 a 12 de Álgebra Lineal (MTM0120).
+
+Elaborado por el Grupo #2: Marian Alejandra Guillén Castillo,
+Chelsea Yosmara Quintanilla Blandón, José Cristo Carvallo Herrera y
+Gabriela Suyen Espinoza Rodríguez.
+
+Modos de ejecución:
+    python main.py              abre la ventana
+    python main.py --consola    abre el menú de texto
+    python main.py --pruebas    ejecuta las comprobaciones automáticas
+
+Programa 7: se utilizan NumPy, SciPy, SymPy y Matplotlib según la
+asignación. SciPy solo contrasta la bisección propia; no la sustituye.
+"""
+
+import sys
+import math
+import tkinter as tk
+from tkinter import font as tkfont
+
+from fractions import Fraction
+
+from modulos import (
+    FONDO, TARJETA, BORDE, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
+    LATERAL, LATERAL_TEXTO, LATERAL_SUAVE, FUENTE_UI,
+    LETRA_MONO, a_numero, formato, LOGO_PRINCIPAL,
+)
+from modulos.modulo_sistemas import (
+    CalculadoraApp, resolver_sistema, escalonar, es_escalonada,
+)
+from modulos.modulo_vectores import (
+    VectoresApp, sumar_vectores, restar_vectores, escalar_por_vector,
+    es_combinacion_lineal, son_linealmente_independientes,
+    relacion_de_dependencia, analizar_independencia,
+    matriz_por_vector, vectores_iguales,
+    verificar_aditividad_matriz_vector, verificar_homogeneidad_matriz_vector,
+    _formato_suma_lineal, _expansion_por_columnas,
+)
+from modulos.modulo_matrices import (
+    MatricesOpsApp, sumar_matrices, restar_matrices, escalar_por_matriz,
+    multiplicar_matrices, resolver_ecuacion_matricial, transponer_matriz,
+    inversa_gauss_jordan, inversa_por_adjunta, matriz_adjunta,
+    comprobar_inversa, verificar_propiedad_inversa, PROPIEDADES_INVERSA,
+)
+from modulos.modulo_determinantes import (
+    determinante, es_invertible, determinante_sarrus, determinante_por_reduccion,
+)
+from modulos.modulo_lu import (
+    LUApp, factorizar_lu, verificar_factorizacion, resolver_lu, MENSAJE_SIN_PERMUTACION,
+    pasos_comprobar_factorizacion, pasos_comprobar_solucion,
+)
+from modulos.modulo_metodos_numericos import (
+    MetodosNumericosApp, ErrorFuncion, analizar_notacion, biseccion,
+    calcular_errores, diagnostico_punto_flotante, parsear_funcion,
+    preparar_datos_grafica, propagacion_error,
+)
+from modulos.modulo_newton import (
+    NewtonApp, newton_raphson, derivar, tabla_formateada, texto_resumen,
+    residuo_sospechoso, crear_figura_newton, pasos_procedimiento,
+)
+from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
+from modulos import (modulo_sistemas, modulo_vectores, modulo_matrices,
+                     modulo_determinantes, modulo_lu, modulo_metodos_numericos,
+                     modulo_iterativos, modulo_newton)
+from teoremas.resumen_teoremas import mostrar_teoremas
+from modulos.modulo_iterativos import IterativosApp
+
+
+class MenuPrincipal:
+    """Armazón de la calculadora: barra lateral fija y panel de contenido.
+
+    Antes cada módulo tapaba el menú y había que volver atrás para
+    cambiar de uno a otro. Ahora la lista de módulos queda siempre a la
+    izquierda y el módulo elegido se dibuja a la derecha, así se ve de
+    un vistazo dónde estás y se cambia de módulo en un clic.
+    """
+
+    # Número, nombre corto para la barra, título largo y clase de la
+    # pantalla. El Módulo 4 no tiene pantalla propia: su motor vive en
+    # Operaciones Matriciales, así que abre su resumen de teoremas.
+    MODULOS = (
+        ("1", "Sistemas", "Sistemas de Ecuaciones Lineales", "sistemas"),
+        ("2", "Vectores", "Vectores e Independencia Lineal", "vectores"),
+        ("3", "Matrices", "Operaciones Matriciales", "matrices"),
+        ("4", "Determinantes", "Determinantes y Propiedades", "determinantes"),
+        ("5", "LU", "Factorización LU (Ax = b)", "lu"),
+        ("6", "Numéricos", "Métodos Numéricos", "numericos"),
+        ("7", "Jacobi", "Jacobi y Gauss-Seidel", "iterativos"),
+        ("8", "Newton", "Método de Newton-Raphson", "newton"),
+    )
+
+    def __init__(self, raiz):
+        self.raiz = raiz
+        self.raiz.title("Calculadora de Álgebra Lineal - Proyecto UAM")
+        self.raiz.configure(bg=FONDO)
+
+        # La ventana se adapta a la pantalla del equipo: pide el tamaño
+        # cómodo, pero nunca más de lo que cabe.
+        ancho = min(1400, self.raiz.winfo_screenwidth() - 80)
+        alto = min(880, self.raiz.winfo_screenheight() - 120)
+        self.raiz.geometry(f"{max(1140, ancho)}x{max(700, alto)}")
+        self.raiz.minsize(1140, 700)
+        self._centrar_ventana()
+
+        self.botones_modulo = {}
+        self.clave_activa = None
+
+        self._construir_barra_lateral()
+        self.contenido = tk.Frame(self.raiz, bg=FONDO)
+        self.contenido.pack(side="right", fill="both", expand=True)
+        self.mostrar_inicio()
+
+    # ---------- barra lateral ----------
+    def _construir_barra_lateral(self):
+        lateral = tk.Frame(self.raiz, bg=LATERAL, width=196)
+        lateral.pack(side="left", fill="y")
+        lateral.pack_propagate(False)
+
+        tk.Label(lateral, text="Calculadora de\nÁlgebra Lineal",
+                 font=(FUENTE_UI, 14, "bold"), bg=LATERAL, fg="#FFFFFF",
+                 justify="left").pack(anchor="w", padx=16, pady=(18, 2))
+        tk.Label(lateral, text="Grupo 2 · UAM · MTM0120",
+                 font=(FUENTE_UI, 8), bg=LATERAL, fg=LATERAL_SUAVE
+                 ).pack(anchor="w", padx=16, pady=(0, 16))
+        tk.Label(lateral, text="MÓDULOS", font=(FUENTE_UI, 8, "bold"),
+                 bg=LATERAL, fg=LATERAL_SUAVE).pack(anchor="w", padx=16,
+                                                    pady=(0, 4))
+
+        for numero, corto, _titulo, clave in self.MODULOS:
+            boton = tk.Label(lateral, text="  " + numero + " · " + corto,
+                             font=(FUENTE_UI, 10), bg=LATERAL,
+                             fg=LATERAL_TEXTO, anchor="w", padx=10, pady=7,
+                             cursor="hand2")
+            boton.pack(fill="x", padx=0)
+            # Se usa Label y no Button para poder pintar la fila entera
+            # cuando el módulo está activo, como una lista de navegación.
+            boton.bind("<Button-1>", lambda _e, c=clave: self.abrir(c))
+            boton.bind("<Enter>", lambda e, c=clave: self._resaltar(c, True))
+            boton.bind("<Leave>", lambda e, c=clave: self._resaltar(c, False))
+            self.botones_modulo[clave] = boton
+
+        tk.Label(lateral, text="Inicio", font=(FUENTE_UI, 9, "underline"),
+                 bg=LATERAL, fg=LATERAL_SUAVE, cursor="hand2"
+                 ).pack(side="bottom", anchor="w", padx=16, pady=14)
+        lateral.winfo_children()[-1].bind("<Button-1>",
+                                          lambda _e: self.mostrar_inicio())
+
+    def _resaltar(self, clave, encima):
+        """Aclara la fila bajo el cursor, salvo la del módulo abierto."""
+        if clave == self.clave_activa:
+            return
+        self.botones_modulo[clave].configure(
+            bg="#0A4F72" if encima else LATERAL)
+
+    def _marcar_activo(self, clave):
+        for otra, boton in self.botones_modulo.items():
+            activo = (otra == clave)
+            boton.configure(bg=ACENTO if activo else LATERAL,
+                            fg="#FFFFFF" if activo else LATERAL_TEXTO,
+                            font=(FUENTE_UI, 10, "bold") if activo
+                            else (FUENTE_UI, 10))
+        self.clave_activa = clave
+
+    # ---------- contenido ----------
+    def _limpiar(self):
+        for hijo in self.contenido.winfo_children():
+            hijo.destroy()
+
+    def mostrar_inicio(self):
+        """Pantalla de bienvenida, con el contenido de cada módulo."""
+        self._limpiar()
+        self._marcar_activo(None)
+        marco = tk.Frame(self.contenido, bg=FONDO)
+        marco.pack(fill="both", expand=True, padx=40, pady=36)
+
+        tk.Label(marco, text="¡Bienvenido a la mejor Calculadora!",
+                 font=(FUENTE_UI, 24, "bold"), bg=FONDO, fg=TEXTO,
+                 anchor="w").pack(fill="x")
+        tk.Label(marco, text="Elegí un módulo en la barra de la izquierda.",
+                 font=(FUENTE_UI, 11), bg=FONDO, fg=TEXTO_SUAVE,
+                 anchor="w").pack(fill="x", pady=(2, 20))
+
+        tarjetas = tk.Frame(marco, bg=FONDO)
+        tarjetas.pack(fill="both", expand=True)
+        for columna in range(2):
+            tarjetas.columnconfigure(columna, weight=1, uniform="col")
+        for indice, (numero, _corto, titulo, clave) in enumerate(self.MODULOS):
+            tarjeta = tk.Frame(tarjetas, bg=TARJETA, highlightbackground=BORDE,
+                               highlightthickness=1, cursor="hand2")
+            tarjeta.grid(row=indice // 2, column=indice % 2, sticky="nsew",
+                         padx=6, pady=6)
+            tk.Label(tarjeta, text="Módulo " + numero, font=(FUENTE_UI, 9),
+                     bg=TARJETA, fg=ACENTO, anchor="w"
+                     ).pack(fill="x", padx=14, pady=(10, 0))
+            tk.Label(tarjeta, text=titulo, font=(FUENTE_UI, 12, "bold"),
+                     bg=TARJETA, fg=TEXTO, anchor="w"
+                     ).pack(fill="x", padx=14, pady=(0, 12))
+            for widget in (tarjeta,) + tuple(tarjeta.winfo_children()):
+                widget.bind("<Button-1>", lambda _e, c=clave: self.abrir(c))
+
+        tk.Label(marco, text="Desarrollado por Grupo 2 • Universidad "
+                             "Americana (UAM)", font=(FUENTE_UI, 9),
+                 bg=FONDO, fg=TEXTO_SUAVE).pack(side="bottom", pady=(14, 0))
+
+    def abrir(self, clave):
+        """Dibuja el módulo pedido dentro del panel de contenido."""
+        self._limpiar()
+        self._marcar_activo(clave)
+        if clave == "determinantes":
+            # El Módulo 4 no tiene pantalla: su motor está en Operaciones
+            # Matriciales, así que se abre su resumen de teoremas.
+            mostrar_teoremas(self.raiz, "determinantes",
+                             "Módulo 4: Determinantes y Propiedades")
+            self.mostrar_inicio()
+            return
+        pantallas = {
+            "sistemas": CalculadoraApp,
+            "vectores": VectoresApp,
+            "matrices": MatricesOpsApp,
+            "lu": LUApp,
+            "numericos": MetodosNumericosApp,
+            "iterativos": IterativosApp,
+            "newton": NewtonApp,
+        }
+        pantallas[clave](self.contenido, callback_volver=self.mostrar_inicio)
+
+    # Nombre que usan los módulos al volver; se conserva por compatibilidad.
+    def mostrar_menu(self):
+        self.mostrar_inicio()
+
+    def _centrar_ventana(self):
+        self.raiz.update_idletasks()
+        ancho = self.raiz.winfo_width()
+        alto = self.raiz.winfo_height()
+        x = max(0, (self.raiz.winfo_screenwidth() - ancho) // 2)
+        y = max(0, (self.raiz.winfo_screenheight() - alto) // 2)
+        self.raiz.geometry(f"+{x}+{y}")
+
+
+
+# BLOQUE 7: PRUEBAS AUTOMÁTICAS DEL ALGORITMO
+# Estos son los casos de prueba internos. Nos sirven para asegurar
+# que ninguna actualización que hagamos dañe la matemática del programa.
+# Validan sistemas Ax=b, operaciones vectoriales y operaciones
+# matriciales, y corren por detrás en la consola.
+# =====================================================================
+
+
+def ejecutar_pruebas():
+    """Ejecuta los sistemas predefinidos y verifica que el algoritmo funciona."""
+    pruebas = [
+        ("Caso 1: solución única", [[1, 1, 1], [2, -1, 1], [1, 2, -1]], [6, 3, 2], "Consistente Determinado", ["1", "2", "3"]),
+        ("Caso 2: infinitas", [[1, 1, 1], [2, 2, 2]], [1, 2], "Consistente Indeterminado", None),
+        ("Caso 3: inconsistente", [[1, 1], [1, 1]], [1, 3], "Inconsistente", None),
+        ("Clase Lay", [[1, -2, 1], [0, 2, -8], [-4, 5, 9]], [0, 8, -9], "Consistente Determinado", ["29", "16", "3"]),
+        ("Actividad 1", [[2, 3, 1], [5, 3, 4], [1, 1, -1]], [1, 2, 1], "Consistente Determinado", ["2/3", "0", "-1/3"]),
+        ("Inconsistente Clase", [[0, 1, -4], [2, -3, 2], [5, -8, 7]], [8, 1, 1], "Inconsistente", None),
+        ("Matriz 5x5", [[1, 2, 0, 1, 1], [0, 1, 1, 0, 0], [0, 0, 1, 1, -1], [0, 0, 0, 1, 2], [0, 0, 0, 0, 1]], [4, 2, 3, 5, 1], "Consistente Determinado", ["-2", "1", "1", "3", "1"]),
+        ("Homogéneo", [[1, 1, 1], [2, -1, 0]], [0, 0], "Consistente Indeterminado", None),
+        ("Ceros", [[0, 0], [0, 0]], [0, 0], "Consistente Indeterminado", None),
+        ("Imposible", [[0]], [7], "Inconsistente", None),
+        ("Intercambio necesario", [[0, 1], [1, 0]], [2, 3], "Consistente Determinado", ["3", "2"]),
+        ("Más ecuaciones", [[1, 0], [0, 1], [1, 1]], [1, 2, 3], "Consistente Determinado", ["1", "2"]),
+        ("Más ecuaciones, incompatible", [[1, 0], [0, 1], [1, 1]], [1, 2, 4], "Inconsistente", None),
+        ("Fracciones", [["1/2", "1/3"], ["1/4", "1/5"]], [1, 1], "Consistente Determinado", ["-8", "15"]),
+        ("Más incógnitas", [[1, 2, 3]], [6], "Consistente Indeterminado", None),
+    ]
+
+
+    fallos = 0
+    print("=" * 64)
+    print("INICIANDO PRUEBAS AUTOMÁTICAS DEL ALGORITMO")
+    print("=" * 64)
+
+
+    for nombre, A, b, clasificacion_esperada, solucion_esperada in pruebas:
+        A = [[a_numero(str(valor)) for valor in fila] for fila in A]
+        b = [a_numero(str(valor)) for valor in b]
+        resultado = resolver_sistema(len(A), len(A[0]), A, b)
+
+
+        problemas = []
+        if resultado["clasificacion"] != clasificacion_esperada:
+            problemas.append(f"Clasificó como {resultado['clasificacion']} pero se esperaba {clasificacion_esperada}")
+        if solucion_esperada is not None:
+            obtenida = [formato(valor) for valor in resultado["solucion"]]
+            if obtenida != solucion_esperada:
+                problemas.append(f"Solución {obtenida} en vez de {solucion_esperada}")
+       
+        correcta, motivo = es_escalonada(resultado["escalonada"])
+        if not correcta:
+            problemas.append(f"Fallo al escalonar: {motivo}")
+       
+        if "FALLO" in resultado["verificacion"]:
+            problemas.append("La verificación de la solución falló")
+
+
+        if problemas:
+            fallos += 1
+            print(f"[FALLA] {nombre}")
+            for p in problemas: print(f"         - {p}")
+        else:
+            print(f"[  OK  ] {nombre}")
+
+
+    # =================================================================
+    # PRUEBAS DEL MÓDULO DE VECTORES
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DEL MÓDULO DE VECTORES")
+    print("--------------------------------")
+
+    def probar(nombre, ok, detalle=""):
+        nonlocal fallos
+        if not ok:
+            fallos += 1
+            print(f"[FALLA] {nombre}   {detalle}")
+        else:
+            print(f"[  OK  ] {nombre}")
+
+    def fr(valor):
+        return a_numero(str(valor))
+
+    # Combinación lineal única: ¿b=(7,4,-3) es combinación de a1 y a2?
+    a1 = [fr(1), fr(-2), fr(-5)]
+    a2 = [fr(2), fr(5), fr(6)]
+    b5 = [fr(7), fr(4), fr(-3)]
+    es_cl, pesos, res5 = es_combinacion_lineal(b5, [a1, a2])
+    probar("Combinación lineal única", es_cl and pesos == [fr(3), fr(2)],
+           f"pesos={pesos}")
+    probar("Expresión b=3·a1+2·a2",
+           _formato_suma_lineal(pesos, "v") == "3·v\u2081 + 2·v\u2082",
+           f"expr={_formato_suma_lineal(pesos, 'v')}")
+
+    # Independientes (RREF = identidad)
+    v1 = [fr(1), fr(-2), fr(3)]
+    v2 = [fr(2), fr(-2), fr(0)]
+    v3 = [fr(0), fr(1), fr(7)]
+    ind_e1, res_e1 = son_linealmente_independientes([v1, v2, v3])
+    probar("Independientes (RREF = identidad)", ind_e1
+           and len(res_e1["variables_libres"]) == 0)
+
+    # Dependientes: x3 libre, relación 2v1+3v2-v3=0
+    w1 = [fr(1), fr(-3), fr(0)]
+    w2 = [fr(3), fr(0), fr(4)]
+    w3 = [fr(11), fr(-6), fr(12)]
+    ind_e2, res_e2 = son_linealmente_independientes([w1, w2, w3])
+    rels = relacion_de_dependencia([w1, w2, w3])
+    probar("Dependientes (x3 libre)", (not ind_e2)
+           and res_e2["variables_libres"] == [2])
+    probar("Relación dependencia 2v1+3v2-v3=0",
+           len(rels) == 1 and rels[0] == [fr(2), fr(3), fr(-1)],
+           f"rels={rels}")
+
+    # Dependientes: columnas homogéneas, x3 libre
+    p1 = [fr(1), fr(0), fr(0)]
+    p2 = [fr(0), fr(1), fr(0)]
+    p3 = [fr(2), fr(3), fr(0)]
+    ind_p8, res_p8 = son_linealmente_independientes([p1, p2, p3])
+    rels_p8 = relacion_de_dependencia([p1, p2, p3])
+    probar("Columnas homogéneas dependientes", (not ind_p8)
+           and res_p8["variables_libres"] == [2])
+    probar("Columnas homogéneas relación correcta",
+           len(rels_p8) == 1 and rels_p8[0] == [fr(2), fr(3), fr(-1)],
+           f"rels={rels_p8}")
+
+    # Producto matriz-vector A·x (regla fila-vector)
+    Aprod = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
+    xprod = [fr(1), fr(2), fr(3)]
+    bprod = matriz_por_vector(Aprod, xprod)
+    probar("Producto A·x (14, 32)", bprod == [fr(14), fr(32)], f"b={bprod}")
+
+    # Validación de dimensiones incompatibles en A·x
+    try:
+        matriz_por_vector([[fr(1), fr(2)]], [fr(1)])
+        probar("A·x dimensiones incompatibles", False, "No lanzó ValueError")
+    except ValueError:
+        probar("A·x dimensiones incompatibles", True)
+
+# Verificación de la propiedad distributiva A(u+v)=Au+Av.
+    A_prop = [[fr("1/2"), fr("1/3")],
+              [fr("-1/3"), fr("1/2")]]
+    u_prop = [fr(1), fr(0)]
+    v_prop = [fr(0), fr(1)]
+    aditividad = verificar_aditividad_matriz_vector(A_prop, u_prop, v_prop)
+    probar("Aditividad: A(u+v)=Au+Av",
+           aditividad["se_cumple"]
+           and aditividad["izquierda"] == [fr("5/6"), fr("1/6")]
+           and aditividad["derecha"] == aditividad["izquierda"])
+
+    # Verificación de homogeneidad con un escalar distinto de 0 y 1.
+    homogeneidad = verificar_homogeneidad_matriz_vector(
+        A_prop, fr(-2), u_prop)
+    probar("Homogeneidad: A(cu)=c(Au)",
+           homogeneidad["se_cumple"]
+           and homogeneidad["izquierda"] == [fr(-1), fr("2/3")]
+           and homogeneidad["derecha"] == homogeneidad["izquierda"])
+
+    # Producto matriz-vector 3×3 con fracciones y vista por columnas.
+    A_rect = [[fr("1/2"), fr(0), fr("1/3")],
+              [fr(0), fr("1/2"), fr("1/3")],
+              [fr("1/3"), fr("1/3"), fr(0)]]
+    x_vector = [fr(1), fr(1), fr(1)]
+    Ax_vector = matriz_por_vector(A_rect, x_vector)
+    probar("Producto A·x con fracciones y combinación de columnas",
+           Ax_vector == [fr("5/6"), fr("5/6"), fr("2/3")]
+           and _formato_suma_lineal(x_vector, "a")
+           == "a₁ + a₂ + a₃")
+
+    # Expansión explícita por columnas (escalares y sumandos vectoriales).
+    columnas_rect = [[fila[j] for fila in A_rect] for j in range(3)]
+    lineas_exp = _expansion_por_columnas(x_vector, columnas_rect, "a", Ax_vector)
+    probar("Expansión explícita por columnas",
+           lineas_exp[0] == "a₁ = ( 1/2,  0,  1/3 )"
+           and lineas_exp[2] == "a₃ = ( 1/3,  1/3,  0 )"
+           and lineas_exp[3] == "1·a₁ + 1·a₂ + 1·a₃ = ( 1/2,  0,  1/3 )"
+           " + ( 0,  1/2,  1/3 ) + ( 1/3,  1/3,  0 ) = ( 5/6,  5/6,  2/3 )",
+           f"lineas={lineas_exp}")
+
+    # Las fracciones se comparan exactamente; float tiene resguardo de tolerancia.
+    probar("Comparación exacta de fracciones",
+           vectores_iguales([fr("1/3") + fr("2/3")], [fr(1)]))
+    probar("Tolerancia para float externo",
+           vectores_iguales([0.1 + 0.2], [0.3]))
+
+    try:
+        verificar_aditividad_matriz_vector([[fr(1), fr(2)]], [fr(1)], [fr(1)])
+        probar("Validación de dimensiones en propiedad", False,
+               "No lanzó ValueError")
+    except ValueError:
+        probar("Validación de dimensiones en propiedad", True)
+
+    # Suma / resta / escalar de vectores
+    u = [fr(1), fr(2), fr(3)]
+    vv = [fr(4), fr(5), fr(6)]
+    probar("Suma de vectores", sumar_vectores(u, vv) == [fr(5), fr(7), fr(9)])
+    probar("Resta de vectores", restar_vectores(u, vv) == [fr(-3), fr(-3), fr(-3)])
+    probar("Escalar por vector", escalar_por_vector(fr(-2), u) == [fr(-2), fr(-4), fr(-6)])
+
+
+    # =================================================================
+    # PRUEBAS DEL MÓDULO DE OPERACIONES MATRICIALES
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DE OPERACIONES MATRICIALES")
+    print("--------------------------------")
+
+    # Suma / resta / escalar de matrices
+    A1 = [[fr(1), fr(2)], [fr(3), fr(4)]]
+    B1 = [[fr(5), fr(6)], [fr(7), fr(8)]]
+    probar("Suma 2x2", sumar_matrices(A1, B1) == [[fr(6), fr(8)], [fr(10), fr(12)]])
+    probar("Resta 2x2", restar_matrices(B1, A1) == [[fr(4), fr(4)], [fr(4), fr(4)]])
+    probar("Escalar por matriz",
+           escalar_por_matriz(fr(3), A1) == [[fr(3), fr(6)], [fr(9), fr(12)]])
+
+    # Multiplicación de matrices (bucles anidados)
+    probar("Producto 2x2", multiplicar_matrices(A1, B1) == [[fr(19), fr(22)], [fr(43), fr(50)]])
+    A3 = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
+    B3 = [[fr(7), fr(8)], [fr(9), fr(10)], [fr(11), fr(12)]]
+    probar("Producto 2x3 * 3x2",
+           multiplicar_matrices(A3, B3) == [[fr(58), fr(64)], [fr(139), fr(154)]])
+    probar("Producto 1x3 * 3x1",
+           multiplicar_matrices([[fr(1), fr(2), fr(3)]], [[fr(4)], [fr(5)], [fr(6)]])
+           == [[fr(32)]])
+
+    # Dimensiones incompatibles
+    try:
+        sumar_matrices([[fr(1), fr(2)]], [[fr(1), fr(2), fr(3)]])
+        probar("Suma dimensiones incompatibles", False, "No lanzó ValueError")
+    except ValueError:
+        probar("Suma dimensiones incompatibles", True)
+    try:
+        multiplicar_matrices([[fr(1), fr(2)]], [[fr(1), fr(2), fr(3)]])
+        probar("Producto dimensiones incompatibles", False, "No lanzó ValueError")
+    except ValueError:
+        probar("Producto dimensiones incompatibles", True)
+
+    # Ecuación matricial x₁v₁ + x₂v₂ + … + xₖvₖ = y (combinación de matrices)
+    # Caso del ejercicio de la diapositiva: v1=(3,-2), v2=(7,3), v3=(-2,1),
+    # y=(0,0). Tres vectores en R^2 => dependientes (infinitas formas).
+    ec1, p1c, r1c = resolver_ecuacion_matricial(
+        [[fr(0)], [fr(0)]],
+        [[[fr(3)], [fr(-2)]], [[fr(7)], [fr(3)]], [[fr(-2)], [fr(1)]]])
+    probar("Ecuación diapositiva (dependiente, infinitas)",
+           ec1 and r1c["clasificacion"] == "Consistente Indeterminado"
+           and r1c["variables_libres"] != [],
+           f"clase={r1c['clasificacion']}")
+
+    # Caso determinado: v1=(1,0), v2=(0,1), y=(3,-2)  ->  x1=3, x2=-2
+    ec2, p2c, r2c = resolver_ecuacion_matricial(
+        [[fr(3)], [fr(-2)]],
+        [[[fr(1)], [fr(0)]], [[fr(0)], [fr(1)]]])
+    probar("Ecuación 2x1 determinada (x1=3, x2=-2)",
+           ec2 and p2c == [fr(3), fr(-2)] and r2c["clasificacion"] == "Consistente Determinado",
+           f"pesos={p2c}")
+
+    # Caso sin solución: v1=(1,2), v2=(2,4), y=(1,0)  -> inconsistente
+    try:
+        ec3, _, r3c = resolver_ecuacion_matricial(
+            [[fr(1)], [fr(0)]],
+            [[[fr(1)], [fr(2)]], [[fr(2)], [fr(4)]]])
+        probar("Ecuación sin solución", (not ec3) and r3c["clasificacion"] == "Inconsistente")
+    except ValueError as e:
+        probar("Ecuación sin solución", False, str(e))
+
+    # Caso con matrices 2x2: x1·[[1,0],[0,1]] + x2·[[0,1],[1,0]] = [[2,3],[3,2]]
+    ec4, p4c, r4c = resolver_ecuacion_matricial(
+        [[fr(2), fr(3)], [fr(3), fr(2)]],
+        [[[fr(1), fr(0)], [fr(0), fr(1)]], [[fr(0), fr(1)], [fr(1), fr(0)]]])
+    probar("Ecuación con matrices 2x2 (x1=2, x2=3)",
+           ec4 and p4c == [fr(2), fr(3)] and r4c["clasificacion"] == "Consistente Determinado",
+           f"pesos={p4c}")
+
+    # Dimensiones distintas dentro de la ecuación matricial
+    try:
+        resolver_ecuacion_matricial(
+            [[fr(2)], [fr(3)]],
+            [[[fr(1), fr(1)]], [[fr(2), fr(2)]]])
+        probar("Ecuación dimensiones distintas", False, "No lanzó ValueError")
+    except ValueError:
+        probar("Ecuación dimensiones distintas", True)
+
+    # --- Transpuesta de una matriz ---
+    A_t = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
+    T = transponer_matriz(A_t)
+    probar("Transpuesta 2x3 -> 3x2",
+           T == [[fr(1), fr(4)], [fr(2), fr(5)], [fr(3), fr(6)]], f"obtuvo {T}")
+    probar("(A^T)^T = A",
+           transponer_matriz(T) == A_t)
+    B_t = [[fr(0), fr(1), fr(1)], [fr(2), fr(0), fr(3)]]
+    probar("(A + B)^T = A^T + B^T",
+           transponer_matriz(sumar_matrices(A_t, B_t))
+           == sumar_matrices(transponer_matriz(A_t), transponer_matriz(B_t)))
+    probar("(rA)^T = r·A^T",
+           transponer_matriz(escalar_por_matriz(fr(3), A_t))
+           == escalar_por_matriz(fr(3), transponer_matriz(A_t)))
+    C_t = [[fr(1), fr(0)], [fr(2), fr(-1)], [fr(0), fr(4)]]
+    probar("(AB)^T = B^T·A^T  (orden invertido)",
+           transponer_matriz(multiplicar_matrices(A_t, C_t))
+           == multiplicar_matrices(transponer_matriz(C_t), transponer_matriz(A_t)))
+    probar("det(A^T) = det(A)",
+           determinante([[fr(3), fr(8)], [fr(4), fr(6)]])
+           == determinante(transponer_matriz([[fr(3), fr(8)], [fr(4), fr(6)]])))
+
+
+
+    # -----------------------------------------------------------------
+    # PRUEBAS DEL PROGRAMA 4: INDEPENDENCIA LINEAL Y DETERMINANTES
+    # -----------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # PRUEBAS DEL PROGRAMA 5: DETERMINANTES E INVERSA
+    # -----------------------------------------------------------------
+    print("--------------------------------")
+    print("PRUEBAS DE INVERSA Y DETERMINANTE (PROGRAMA 5)")
+    print("--------------------------------")
+
+    A_inv = [[fr(1), fr(2), fr(3)], [fr(0), fr(1), fr(4)], [fr(5), fr(6), fr(0)]]
+    esperada = [[fr(-24), fr(18), fr(5)], [fr(20), fr(-15), fr(-4)],
+                [fr(-5), fr(4), fr(1)]]
+    probar("Inversa por Gauss-Jordan 3x3",
+           inversa_gauss_jordan(A_inv) == esperada)
+    probar("Inversa por matriz adjunta 3x3",
+           inversa_por_adjunta(A_inv) == esperada)
+    probar("Los dos métodos dan la misma inversa",
+           inversa_gauss_jordan(A_inv) == inversa_por_adjunta(A_inv))
+    _, _, cumple_identidad = comprobar_inversa(A_inv, inversa_gauss_jordan(A_inv))
+    probar("Comprobación A·A⁻¹ = I (y A⁻¹·A = I)", cumple_identidad)
+
+    A2 = [[fr(1), fr(2)], [fr(3), fr(4)]]
+    probar("adj(A) de una 2x2",
+           matriz_adjunta(A2) == [[fr(4), fr(-2)], [fr(-3), fr(1)]])
+    probar("Inversa 2x2 con fracciones exactas",
+           inversa_gauss_jordan(A2) == [[fr(-2), fr(1)],
+                                        [fr("3/2"), fr("-1/2")]])
+
+    singular = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)], [fr(7), fr(8), fr(9)]]
+    for nombre, funcion in (("Gauss-Jordan", inversa_gauss_jordan),
+                            ("adjunta", inversa_por_adjunta)):
+        try:
+            funcion(singular)
+            probar("Matriz singular avisa (" + nombre + ")", False, "No lanzó ValueError")
+        except ValueError:
+            probar("Matriz singular avisa (" + nombre + ")", True)
+
+    A_det = [[fr(1), fr(3), fr(-3)], [fr(2), fr(0), fr(1)], [fr(-1), fr(4), fr(-2)]]
+    probar("Sarrus coincide con cofactores",
+           determinante_sarrus(A_det) == determinante(A_det) == fr(-19))
+    probar("Reducción coincide con cofactores (3x3)",
+           determinante_por_reduccion(A_det)[0] == fr(-19))
+    A4 = [[fr(2), fr(1), fr(0), fr(3)], [fr(3), fr(0), fr(-2), fr(0)],
+          [fr(4), fr(-1), fr(1), fr(2)], [fr(5), fr(2), fr(0), fr(1)]]
+    probar("Reducción coincide con cofactores (4x4)",
+           determinante_por_reduccion(A4)[0] == determinante(A4) == fr(85))
+    try:
+        determinante_sarrus(A2)
+        probar("Sarrus rechaza las que no son 3x3", False, "No lanzó ValueError")
+    except ValueError:
+        probar("Sarrus rechaza las que no son 3x3", True)
+
+    # Las seis propiedades de las Sesiones 10 y 11, con A y B del enunciado
+    B_prop = [[fr(0), fr(1)], [fr(1), fr(1)]]
+    for indice, nombre in enumerate(PROPIEDADES_INVERSA):
+        resultado = verificar_propiedad_inversa(indice, A2, B_prop,
+                                                fila_i=1, fila_j=0, k=fr(3))
+        probar("Propiedad " + str(indice + 1) + ": " + nombre,
+               resultado["se_cumple"])
+
+    print("--------------------------------")
+    print("PRUEBAS DE INDEPENDENCIA LINEAL (PROGRAMA 4)")
+    print("--------------------------------")
+
+    casos_li = [
+        # (nombre, vectores, esperado_independientes, pivotes, libres)
+        ("Base canónica de R^3 (L.I.)",
+         [[1, 0, 0], [0, 1, 0], [0, 0, 1]], True, 3, 0),
+        ("Uno es múltiplo de otro (L.D.)",
+         [[1, 2, 3], [2, 4, 6], [1, 1, 1]], False, 2, 1),
+        ("Dos vectores no paralelos en R^2 (L.I.)",
+         [[1, 0], [1, 1]], True, 2, 0),
+        ("Tres vectores en R^2, siempre L.D.",
+         [[1, 0], [0, 1], [3, 5]], False, 2, 1),
+        ("Incluye el vector cero (L.D.)",
+         [[1, 2], [0, 0]], False, 1, 1),
+    ]
+    for nombre, vs, esperado, piv, libres in casos_li:
+        r = analizar_independencia(vs)
+        ok = (r["independientes"] == esperado
+              and r["cantidad_pivotes"] == piv
+              and r["cantidad_libres"] == libres)
+        if ok:
+            print(f"[  OK  ] {nombre}")
+        else:
+            fallos += 1
+            print(f"[ FALLO ] {nombre}: obtuvo pivotes={r['cantidad_pivotes']}, "
+                  f"libres={r['cantidad_libres']}, L.I.={r['independientes']}")
+
+    # La relación de dependencia debe anular realmente la combinación
+    vs = [[1, 2, 3], [2, 4, 6], [1, 1, 1]]
+    rel = relacion_de_dependencia(vs)
+    if rel:
+        suma = [sum(rel[0][j] * vs[j][i] for j in range(len(vs)))
+                for i in range(len(vs[0]))]
+        if all(valor == 0 for valor in suma):
+            print("[  OK  ] La relación de dependencia anula la combinación")
+        else:
+            fallos += 1
+            print(f"[ FALLO ] La relación no da cero: {suma}")
+    else:
+        fallos += 1
+        print("[ FALLO ] No encontró relación de dependencia en un caso L.D.")
+
+    print("--------------------------------")
+    print("PRUEBAS DE DETERMINANTES")
+    print("--------------------------------")
+    casos_det = [
+        ("Determinante 2x2", [[3, 8], [4, 6]], -14),
+        ("Determinante 3x3", [[6, 1, 1], [4, -2, 5], [2, 8, 7]], -306),
+        ("Identidad 3x3 vale 1", [[1, 0, 0], [0, 1, 0], [0, 0, 1]], 1),
+        ("Triangular: producto de la diagonal",
+         [[2, 7, 1], [0, 5, -3], [0, 0, 4]], 40),
+        ("Matriz singular (columnas L.D.)", [[1, 2], [2, 4]], 0),
+    ]
+    for nombre, M, esperado in casos_det:
+        obtenido = determinante(M)
+        if obtenido == esperado:
+            print(f"[  OK  ] {nombre}")
+        else:
+            fallos += 1
+            print(f"[ FALLO ] {nombre}: esperaba {esperado}, obtuvo {obtenido}")
+
+    # Coherencia entre los dos módulos: det = 0  <->  columnas L.D.
+    M = [[1, 2], [2, 4]]
+    columnas = [[M[i][j] for i in range(2)] for j in range(2)]
+    if (determinante(M) == 0) == (not analizar_independencia(columnas)["independientes"]):
+        print("[  OK  ] det(A)=0 coincide con columnas linealmente dependientes")
+    else:
+        fallos += 1
+        print("[ FALLO ] El determinante no coincide con la independencia de columnas")
+
+    # =================================================================
+    # PRUEBAS DEL PROGRAMA 6: FACTORIZACIÓN LU Y SOLUCIÓN A·x = b
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DE FACTORIZACIÓN LU (PROGRAMA 6)")
+    print("--------------------------------")
+
+    A_lu = [[fr(2), fr(1), fr(-1)],
+            [fr(-3), fr(-1), fr(2)],
+            [fr(-2), fr(1), fr(2)]]
+    L_lu, U_lu, _ = factorizar_lu(A_lu)
+    _, ok_lu = verificar_factorizacion(A_lu, L_lu, U_lu)
+    probar("L·U == A (3x3)", ok_lu)
+    probar("L es triangular inferior con unos en la diagonal",
+           all(L_lu[i][i] == fr(1) for i in range(3))
+           and all(L_lu[i][j] == fr(0) for i in range(3)
+                   for j in range(i + 1, 3)))
+
+    datos_lu = resolver_lu(A_lu, [fr(8), fr(-11), fr(-3)])
+    probar("Sustitución hacia adelante: y = (8, 1, 1)",
+           datos_lu["y"] == [fr(8), fr(1), fr(1)], f"y={datos_lu['y']}")
+    probar("Sustitución hacia atrás: x = (2, 3, -1)",
+           datos_lu["x"] == [fr(2), fr(3), fr(-1)], f"x={datos_lu['x']}")
+    probar("Comprobación A·x == b", datos_lu["solucion_correcta"])
+
+    # A rectangular 2x3: se factoriza y verifica, pero no se resuelve Ax=b.
+    A_rect_lu = [[fr(1), fr(2), fr(3)], [fr(4), fr(5), fr(6)]]
+    L_r, U_r, _ = factorizar_lu(A_rect_lu)
+    _, ok_r = verificar_factorizacion(A_rect_lu, L_r, U_r)
+    probar("L·U == A con A rectngular 2x3",
+           ok_r and len(L_r) == 2 and len(L_r[0]) == 2
+           and len(U_r) == 2 and len(U_r[0]) == 3)
+
+    # El botón «Ver L·U = A» desarrolla cada entrada y la compara con A.
+    texto_lu = "\n".join(pasos_comprobar_factorizacion(A_lu, L_lu, U_lu))
+    probar("Comprobación L·U muestra las cuentas fila-columna",
+           "(L·U)[1][1] = (1)·(2) + (0)·(0) + (0)·(0) = 2 + 0 + 0 = 2"
+           in texto_lu
+           and texto_lu.count("✓") == 9
+           and "La factorización es correcta (L · U == A)." in texto_lu,
+           f"texto={texto_lu[:120]}...")
+
+    texto_rect = "\n".join(pasos_comprobar_factorizacion(A_rect_lu, L_r, U_r))
+    probar("Comprobación L·U en rectangular 2x3 (6 entradas)",
+           texto_rect.count("✓") == 6
+           and "La factorización es correcta (L · U == A)." in texto_rect)
+
+    # Una U alterada debe delatarse: la comprobación no es decorativa.
+    U_mala = [list(fila) for fila in U_lu]
+    U_mala[0][0] = U_mala[0][0] + 1
+    texto_malo = "\n".join(pasos_comprobar_factorizacion(A_lu, L_lu, U_mala))
+    probar("La comprobación detecta una L·U incorrecta",
+           "✗" in texto_malo
+           and "¡Atención! L · U no coincide con A." in texto_malo)
+
+    # El botón «Ver A·x = b» desarrolla el producto matriz-vector.
+    texto_ax = "\n".join(pasos_comprobar_solucion(
+        A_lu, datos_lu["x"], [fr(8), fr(-11), fr(-3)]))
+    probar("Comprobación A·x muestra la regla fila-vector",
+           "(A·x)[1] = (2)·(2) + (1)·(3) + (-1)·(-1) = 4 + 3 + 1 = 8"
+           in texto_ax
+           and texto_ax.count("✓") == 3
+           and texto_ax.strip().endswith("Comprobación exitosa: A · x == b"),
+           f"texto={texto_ax[:120]}...")
+
+    texto_ax_malo = "\n".join(pasos_comprobar_solucion(
+        A_lu, [fr(0), fr(0), fr(0)], [fr(8), fr(-11), fr(-3)]))
+    probar("La comprobación detecta un A·x incorrecto",
+           "✗" in texto_ax_malo
+           and "¡Atención! A · x no coincide con b" in texto_ax_malo)
+
+    # Pivote diagonal cero que exigiría intercambio de filas.
+    try:
+        factorizar_lu([[fr(0), fr(1)], [fr(1), fr(0)]])
+        probar("Avisa cuando requiere pivoteo parcial", False, "No lanzó ValueError")
+    except ValueError as error:
+        probar("Avisa cuando requiere pivoteo parcial",
+               str(error) == MENSAJE_SIN_PERMUTACION)
+
+    # =================================================================
+    # PRUEBAS DEL PROGRAMA 7: MÉTODOS NUMÉRICOS
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DE MÉTODOS NUMÉRICOS (PROGRAMA 7)")
+    print("--------------------------------")
+
+    casos_biseccion = [
+        ("x**3 - 2*x - 5", 2, 3, 2.09455148),
+        ("cos(x) - x", 0, 1, 0.73908513),
+        ("x**2 - 2", 1, 2, 1.41421356),
+        ("x**3 + x - 1", 0, 1, 0.68232780),
+    ]
+    for expresion, limite_a, limite_b, referencia in casos_biseccion:
+        try:
+            resultado_num = biseccion(
+                parsear_funcion(expresion), limite_a, limite_b,
+                1e-4, 100, contrastar=True,
+            )
+            probar(
+                "Bisección " + expresion,
+                math.isclose(resultado_num.raiz, referencia, abs_tol=1e-4)
+                and resultado_num.teoricas == 14
+                and resultado_num.estado == "tolerancia",
+                f"raíz={resultado_num.raiz}, n={resultado_num.teoricas}",
+            )
+        except Exception as error:
+            probar("Bisección " + expresion, False, str(error))
+
+    try:
+        biseccion(parsear_funcion("x**2 + 1"), -1, 1, 1e-4, 100)
+        probar("Rechaza intervalo sin cambio de signo", False, "No lanzó error")
+    except ValueError as error:
+        probar("Rechaza intervalo sin cambio de signo", "cambio de signo" in str(error))
+
+    try:
+        extremo = biseccion(parsear_funcion("x**2 - 1"), 1, 2, 1e-4, 100)
+        probar("Reconoce raíz en un extremo", extremo.raiz == 1 and not extremo.iteraciones)
+    except Exception as error:
+        probar("Reconoce raíz en un extremo", False, str(error))
+
+    try:
+        biseccion(parsear_funcion("1/x"), -1, 1, 1e-4, 100)
+        probar("Rechaza discontinuidad 1/x", False, "No lanzó error")
+    except ErrorFuncion as error:
+        probar("Rechaza discontinuidad 1/x", "continua" in str(error).lower())
+
+    try:
+        limitado = biseccion(parsear_funcion("x**3 - 2*x - 5"), 2, 3, 1e-12, 2)
+        probar("Informa máximo insuficiente", limitado.estado == "maximo_iteraciones")
+    except Exception as error:
+        probar("Informa máximo insuficiente", False, str(error))
+
+    try:
+        parsear_funcion("x^2")
+        probar("Rechaza ^ como potencia", False, "No lanzó error")
+    except ErrorFuncion as error:
+        probar("Rechaza ^ como potencia", "**" in str(error))
+
+    try:
+        segmentos = preparar_datos_grafica(parsear_funcion("1/(x - 1)"), -2, 3)
+        probar("Grafica racional sin cruzar asíntota", len(segmentos) >= 2)
+    except Exception as error:
+        probar("Grafica racional sin cruzar asíntota", False, str(error))
+
+    try:
+        posicion = analizar_notacion("11110011", 2)
+        probar("Notación posicional binaria", posicion["valor_decimal"] == 243)
+        posicion10 = analizar_notacion("84506", 10)
+        probar("Notación posicional decimal", posicion10["valor_decimal"] == 84506)
+    except Exception as error:
+        probar("Notación posicional", False, str(error))
+
+    try:
+        errores_num = calcular_errores(0, 0.25)
+        probar("Error relativo indefinido cuando xv=0",
+               errores_num["relativo"] is None and errores_num["porcentual"] is None)
+        from modulos.modulo_metodos_numericos import _numero_flotante
+        errores_fraccion = calcular_errores(_numero_flotante("1/3", "xv"), 0.333)
+        probar("xv acepta fracciones (1/3)",
+               abs(errores_fraccion["verdadero"] - 1 / 3) < 1e-15)
+        try:
+            _numero_flotante("1/0", "xv")
+            rechazo = False
+        except ValueError:
+            rechazo = True
+        probar("xv rechaza fracciones con denominador 0", rechazo)
+        propagacion = propagacion_error(0.5, 0.001)
+        probar("Propagación de error", propagacion["diferencia"] >= 0)
+        flotante = diagnostico_punto_flotante()
+        probar("Diagnóstico de punto flotante",
+               flotante["epsilon"] > 0 and flotante["comparacion"] is False)
+    except Exception as error:
+        probar("Errores numéricos", False, str(error))
+
+    # =================================================================
+    # PRUEBAS DEL MODULO 8: NEWTON-RAPHSON (PROGRAMA 9)
+    # =================================================================
+    print("--------------------------------")
+    print("PRUEBAS DEL MODULO 8: NEWTON-RAPHSON")
+    print("--------------------------------")
+
+    try:
+        # Ejemplo 1 de la Sesion 22: converge en 4 iteraciones a 0.567143.
+        convergente = newton_raphson("exp(-x) - x", 0)
+        probar("Newton converge en el ejemplo de clase",
+               convergente.estado == "convergencia"
+               and len(convergente.iteraciones) == 4,
+               f"estado={convergente.estado} it={len(convergente.iteraciones)}")
+        probar("Raiz aproximada 0.567143",
+               abs(convergente.raiz - 0.5671432904) < 1e-9,
+               f"raiz={convergente.raiz}")
+        probar("El residuo |f(x)| queda practicamente en cero",
+               convergente.residuo < 1e-12 and not residuo_sospechoso(convergente),
+               f"residuo={convergente.residuo}")
+
+        # La derivada simbolica debe coincidir con la analitica.
+        derivada_cubica = derivar("x**3 - 2*x - 5")
+        probar("Derivada simbolica de x^3-2x-5 evaluada en 2 vale 10",
+               abs(derivada_cubica.evaluar(2) - 10) < 1e-12)
+
+        # Ejemplo 2 de la Sesion 22 (polinomio de grado 5).
+        polinomio = newton_raphson("x**5 - 4*x**4 + 5*x**3 - 6*x + 4", -1.25)
+        probar("Ejemplo del polinomio: 4 iteraciones hasta -1",
+               len(polinomio.iteraciones) == 4
+               and abs(polinomio.raiz + 1) < 1e-6,
+               f"raiz={polinomio.raiz} it={len(polinomio.iteraciones)}")
+
+        # Caso 2 obligatorio: derivada exactamente cero, parada controlada.
+        derivada_cero = newton_raphson("x**2 - 4", 0)
+        probar("Se detiene cuando f'(x) = 0",
+               derivada_cero.estado == "derivada_nula"
+               and len(derivada_cero.iteraciones) == 1)
+        probar("La fila de la derivada nula no inventa x(i+1)",
+               derivada_cero.iteraciones[0].x_siguiente is None)
+
+        # Caso 3 obligatorio: oscilacion 0, 1, 0, 1 ... sin converger.
+        oscilante = newton_raphson("x**3 - 2*x + 2", 0, max_iteraciones=10)
+        probar("Avisa cuando no alcanza el criterio de parada",
+               oscilante.estado == "max_iteraciones"
+               and len(oscilante.iteraciones) == 10)
+        probar("El error relativo es None cuando x(i+1) = 0",
+               oscilante.iteraciones[1].error_relativo is None)
+
+        # Caso 4 complementario: derivada muy pequena, 42 iteraciones.
+        lento = newton_raphson("x**10 - 1", 0.5, max_iteraciones=60)
+        probar("Derivada muy pequena: converge pero en 42 iteraciones",
+               lento.estado == "convergencia"
+               and len(lento.iteraciones) == 42,
+               f"it={len(lento.iteraciones)}")
+
+        # La tabla debe traer las siete columnas y la notacion de clase.
+        tabla = tabla_formateada(convergente)
+        probar("La tabla tiene las 7 columnas de la Sesion 22",
+               list(tabla.columns) == ["i", "x_i", "f(x_i)", "f'(x_i)",
+                                       "x_(i+1)", "ea", "ea (%)"])
+        probar("Los errores chicos salen como 8.32 x 10^-4",
+               "8.32 \u00d7 10\u207b\u2074" in tabla.iloc[2]["ea"],
+               f"celda={tabla.iloc[2]['ea']}")
+
+        # El resumen no debe llamar "raiz" a un proceso que se corto.
+        resumen_cortado = texto_resumen(derivada_cero)
+        probar("No etiqueta como raiz una corrida detenida",
+               "Ultima aproximacion" in resumen_cortado
+               or "\u00daltima aproximaci\u00f3n" in resumen_cortado)
+
+        # El procedimiento debe traer los seis pasos de la Sesion 22 y
+        # respetar el orden en que se escribio la funcion.
+        desarrollo = "\n".join(pasos_procedimiento(convergente))
+        probar("El procedimiento desarrolla cada iteracion",
+               "ITERACI\u00d3N 1:" in desarrollo
+               and "6) \u00bfDetener?" in desarrollo
+               and "COMPROBACI\u00d3N FINAL" in desarrollo)
+        probar("La sustitucion respeta el orden escrito de f(x)",
+               "f(0.000000) = exp(-0.000000) - 0.000000" in desarrollo,
+               "no aparece la sustitucion literal")
+        probar("Desarrolla la cuenta termino a termino",
+               "f(0.000000) = 1.000000 - 0.000000 = 1.000000" in desarrollo)
+        corte = "\n".join(pasos_procedimiento(derivada_cero))
+        probar("El procedimiento explica por que se detuvo",
+               "El proceso se detiene." in corte)
+
+        # La grafica debe dibujar una tangente por iteracion util.
+        figura = crear_figura_newton(convergente)
+        tangentes = [linea for linea in figura.axes[0].lines
+                     if linea.get_linestyle() == "--"]
+        probar("La grafica dibuja las rectas tangentes",
+               len(tangentes) == 4, f"tangentes={len(tangentes)}")
+    except Exception as error:
+        probar("Newton-Raphson", False, str(error))
+
+    print("=" * 64)
+    if fallos == 0:
+        print("¡Excelente! Todas las comprobaciones pasaron correctamente.")
+    else:
+        print(f"Alerta: Se encontraron {fallos} fallos matemáticos.")
+    print("=" * 64)
+    return fallos
+
+
+# =====================================================================
+# PUNTO DE ENTRADA
+# Solo le decimos a Python que abra
+# la ventana del menú principal y mantenga la aplicación ejecutándose.
+# =====================================================================
+
+# =====================================================================
+# MENÚ PRINCIPAL EN MODO CONSOLA (CLI)
+#
+# La Tarea 4 pide que cada módulo tenga su cabecera con logotipo ASCII
+# y un menú interno con la opción "0. Ver Teoremas Clave del Módulo".
+# Eso se cumple aquí: la calculadora se puede usar de dos maneras,
+#   - con la interfaz gráfica (Tkinter), que es la forma habitual, y
+#   - en modo consola, que es esta, con los logotipos y los menús de
+#     texto de cada módulo.
+# Las dos formas usan EXACTAMENTE el mismo motor matemático; lo único
+# que cambia es cómo se piden los datos y cómo se muestran.
+# =====================================================================
+
+def menu_consola():
+    """Menú principal de la calculadora en modo consola."""
+    while True:
+        mostrar_cabecera(LOGO_PRINCIPAL)
+        print("   Seleccioná el módulo en el que querés trabajar:")
+        print()
+        print("   1. Sistemas de Ecuaciones Lineales (SEL)")
+        print("   2. Vectores e Independencia Lineal")
+        print("   3. Álgebra de Matrices")
+        print("   4. Determinantes y Propiedades")
+        print("   5. Factorización LU y solución A·x = b")
+        print("   6. Métodos Numéricos")
+        print("   7. Jacobi y Gauss-Seidel")
+        print("   8. Método de Newton-Raphson (raíces)")
+        print()
+        print("   0. Ejecutar las pruebas automáticas")
+        print("   9. Salir")
+        print()
+        opcion = preguntar("   Elegí una opción: ").strip()
+
+        if opcion == "9":
+            limpiar_pantalla()
+            print("   Hasta luego. Grupo 2 - Universidad Americana (UAM)")
+            print()
+            return
+        elif opcion == "1":
+            modulo_sistemas.menu_consola()
+        elif opcion == "2":
+            modulo_vectores.menu_consola()
+        elif opcion == "3":
+            modulo_matrices.menu_consola()
+        elif opcion == "4":
+            modulo_determinantes.menu_consola()
+        elif opcion == "5":
+            modulo_lu.menu_consola()
+        elif opcion == "6":
+            modulo_metodos_numericos.menu_consola()
+        elif opcion == "7":
+            modulo_iterativos.menu_consola()
+        elif opcion == "8":
+            modulo_newton.menu_consola()
+        elif opcion == "0":
+            limpiar_pantalla()
+            ejecutar_pruebas()
+            pausa()
+        else:
+            print("   Opción no válida.")
+            pausa()
+
+
+# =====================================================================
+# PUNTO DE ENTRADA
+# =====================================================================
+def main():
+    """Arranca la calculadora.
+
+    Sin argumentos abre la interfaz gráfica. Con --consola abre el modo
+    de texto con los logotipos ASCII y los menús internos de cada
+    módulo. Con --pruebas corre las comprobaciones automáticas.
+    """
+    if "--pruebas" in sys.argv:
+        sys.exit(1 if ejecutar_pruebas() else 0)
+
+    if "--consola" in sys.argv or "--cli" in sys.argv:
+        try:
+            menu_consola()
+        except SalirDeLaConsola:
+            print("\n\n   Entrada interrumpida. Cerrando la calculadora.\n")
+        return
+
+    raiz = tk.Tk()
+    MenuPrincipal(raiz)
+    raiz.mainloop()
+
+
+if __name__ == "__main__":
+    main()

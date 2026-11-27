@@ -246,6 +246,13 @@ LOGO_LU = (
     "=================================================="
 )
 
+LOGO_ESPACIOS = (
+    "==================================================\n"
+    " T(x) = A.x    MODULO: TRANSFORMACIONES LINEALES\n"
+    " Nucleo, Imagen, Rango, Nulidad y Dimension\n"
+    "=================================================="
+)
+
 LOGO_PRINCIPAL = (
     "==================================================\n"
     "   CALCULADORA DE ALGEBRA LINEAL  -  GRUPO 2\n"
