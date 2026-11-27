@@ -39,29 +39,42 @@ if hasattr(sys.stderr, "reconfigure"):
 # Usamos la paleta personalizada: fondo blanco, texto negro y
 # detalles en tonos océano para los botones.
 # =====================================================================
-FONDO              = "#FFFFFF"   # Blanco puro para fondos y tarjetas
-TARJETA            = "#FFFFFF"  
-TEXTO              = "#000000"   # Negro puro para números y ecuaciones
-TEXTO_SUAVE        = "#333333"   # Gris oscuro para subtítulos
+# ---------------------------------------------------------------------
+# PALETA "OCEANO AFINADO"
+# Un solo lugar para los colores: los ocho modulos importan estos
+# nombres, asi que cambiar un valor aqui repinta toda la calculadora.
+# ---------------------------------------------------------------------
+FONDO              = "#F4F7F9"   # Fondo general de las pantallas
+TARJETA            = "#FFFFFF"   # Fondo de las tarjetas y las tablas
+BORDE              = "#D9E6EE"   # Borde suave de cualquier tarjeta
+TEXTO              = "#0B1F2A"   # Texto principal (azul casi negro)
+TEXTO_SUAVE        = "#5A6B75"   # Subtitulos y etiquetas secundarias
 
+ACENTO             = "#0A6E9E"   # Azul principal: botones y encabezados
+ACENTO_HOVER       = "#073B57"   # Azul profundo: hover y barra lateral
+BOTON_SEC          = "#D9E6EE"   # Botones de apoyo
+BOTON_SEC_HOVER    = "#BBD3E0"   # Hover de los botones de apoyo
 
-ACENTO             = "#0077B6"   # Vibrante Zafiro (Botón principal)
-ACENTO_HOVER       = "#023E8A"   # Oscuro Índigo (Hover del principal)
-BOTON_SEC          = "#90E0EF"   # Claro Aguamarina (Botones de apoyo)
-BOTON_SEC_HOVER    = "#00B4D8"   # Tabla de Surf (Hover de apoyo)
-CELDA_BORDE        = "#00B4D8"   # Bordes de la matriz
-LINEA_MATRIZ       = "#00B4D8"   # Líneas de la cuadrícula de la matriz
-BARRA_AB           = "#023E8A"   # Barra que separa A de b en [A|b]
+LATERAL            = "#073B57"   # Fondo de la barra lateral de modulos
+LATERAL_TEXTO      = "#CFE3EE"   # Texto de la barra lateral
+LATERAL_SUAVE      = "#7FB3CC"   # Rotulos pequenos de la barra lateral
+
+CELDA_BORDE        = "#B9CFDA"   # Bordes de las casillas de la matriz
+LINEA_MATRIZ       = "#B9CFDA"   # Lineas de la cuadricula
+BARRA_AB           = "#073B57"   # Barra que separa A de b en [A|b]
 CELDA_FONDO        = "#FFFFFF"   # Fondo normal de una casilla
-CELDA_FOCO         = "#CAF0F8"   # Casilla donde se está escribiendo
-CELDA_ERROR        = "#F8D7DA"   # Casilla con un valor inválido
+CELDA_FOCO         = "#DCEDF6"   # Casilla donde se esta escribiendo
+CELDA_ERROR        = "#FBE4E2"   # Casilla con un valor invalido
 
+# Color con significado: el mismo en los ocho modulos.
+EXITO              = "#14543A"   # Texto: correcto / convergio
+EXITO_FONDO        = "#E7F3EA"
+ADVERTENCIA        = "#7A4A12"   # Texto: atencion / sin solucion unica
+ADVERTENCIA_FONDO  = "#FBEEDD"
+ERROR              = "#8A201A"   # Texto: error / inconsistente
+ERROR_FONDO        = "#FBE4E2"
 
-EXITO              = "#059669"   # Verde para la comprobación correcta
-ADVERTENCIA        = "#8A4E02"   # Oscuro Mandarina (Infinitas soluciones)
-ERROR              = "#8A0A02"   # Rico Escarlata (Sistema inconsistente)
-
-
+FUENTE_UI          = "Segoe UI"  # Interfaz (viene instalada en Windows)
 LETRA_MONO         = "Consolas"
 MAX_DIMENSION      = 8          
 

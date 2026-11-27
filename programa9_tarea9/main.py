@@ -31,7 +31,8 @@ from tkinter import font as tkfont
 from fractions import Fraction
 
 from modulos import (
-    FONDO, TARJETA, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
+    FONDO, TARJETA, BORDE, TEXTO, TEXTO_SUAVE, ACENTO, ACENTO_HOVER,
+    LATERAL, LATERAL_TEXTO, LATERAL_SUAVE, FUENTE_UI,
     LETRA_MONO, a_numero, formato, LOGO_PRINCIPAL,
 )
 from modulos.modulo_sistemas import (
@@ -65,7 +66,7 @@ from modulos.modulo_metodos_numericos import (
 )
 from modulos.modulo_newton import (
     NewtonApp, newton_raphson, derivar, tabla_formateada, texto_resumen,
-    residuo_sospechoso, crear_figura_newton,
+    residuo_sospechoso, crear_figura_newton, pasos_procedimiento,
 )
 from modulos import mostrar_cabecera, limpiar_pantalla, pausa, preguntar, SalirDeLaConsola
 from modulos import (modulo_sistemas, modulo_vectores, modulo_matrices,
@@ -76,7 +77,28 @@ from modulos.modulo_iterativos import IterativosApp
 
 
 class MenuPrincipal:
-    """Pantalla inicial del sistema para elegir el módulo."""
+    """Armazón de la calculadora: barra lateral fija y panel de contenido.
+
+    Antes cada módulo tapaba el menú y había que volver atrás para
+    cambiar de uno a otro. Ahora la lista de módulos queda siempre a la
+    izquierda y el módulo elegido se dibuja a la derecha, así se ve de
+    un vistazo dónde estás y se cambia de módulo en un clic.
+    """
+
+    # Número, nombre corto para la barra, título largo y clase de la
+    # pantalla. El Módulo 4 no tiene pantalla propia: su motor vive en
+    # Operaciones Matriciales, así que abre su resumen de teoremas.
+    MODULOS = (
+        ("1", "Sistemas", "Sistemas de Ecuaciones Lineales", "sistemas"),
+        ("2", "Vectores", "Vectores e Independencia Lineal", "vectores"),
+        ("3", "Matrices", "Operaciones Matriciales", "matrices"),
+        ("4", "Determinantes", "Determinantes y Propiedades", "determinantes"),
+        ("5", "LU", "Factorización LU (Ax = b)", "lu"),
+        ("6", "Numéricos", "Métodos Numéricos", "numericos"),
+        ("7", "Jacobi", "Jacobi y Gauss-Seidel", "iterativos"),
+        ("8", "Newton", "Método de Newton-Raphson", "newton"),
+    )
+
     def __init__(self, raiz):
         self.raiz = raiz
         self.raiz.title("Calculadora de Álgebra Lineal - Proyecto UAM")
@@ -84,88 +106,137 @@ class MenuPrincipal:
 
         # La ventana se adapta a la pantalla del equipo: pide el tamaño
         # cómodo, pero nunca más de lo que cabe.
-        ancho = min(1300, self.raiz.winfo_screenwidth() - 80)
-        alto = min(840, self.raiz.winfo_screenheight() - 120)
-        self.raiz.geometry(f"{max(1120, ancho)}x{max(700, alto)}")
-        self.raiz.minsize(1120, 700)
+        ancho = min(1400, self.raiz.winfo_screenwidth() - 80)
+        alto = min(880, self.raiz.winfo_screenheight() - 120)
+        self.raiz.geometry(f"{max(1140, ancho)}x{max(700, alto)}")
+        self.raiz.minsize(1140, 700)
         self._centrar_ventana()
 
-        self.frame_menu = tk.Frame(self.raiz, bg=FONDO)
-        self.frame_menu.pack(fill="both", expand=True)
+        self.botones_modulo = {}
+        self.clave_activa = None
 
-        # El pie se empaqueta primero para que siempre quede visible abajo.
-        tk.Label(self.frame_menu, text="Desarrollado por Grupo 2 • Universidad Americana (UAM)",
-                 font=("Montserrat", 10), bg=FONDO, fg=TEXTO_SUAVE).pack(side="bottom", pady=14)
+        self._construir_barra_lateral()
+        self.contenido = tk.Frame(self.raiz, bg=FONDO)
+        self.contenido.pack(side="right", fill="both", expand=True)
+        self.mostrar_inicio()
 
-        tk.Label(self.frame_menu, text="¡Bienvenido a la mejor Calculadora!",
-                 font=("Montserrat", 24, "bold"), bg=FONDO, fg=TEXTO).pack(pady=(24, 4))
-        tk.Label(self.frame_menu, text="Proyecto de Álgebra Lineal",
-                 font=("Montserrat", 15), bg=FONDO, fg=TEXTO_SUAVE).pack(pady=(0, 14))
-        tk.Label(self.frame_menu, text="Selecciona el módulo en el que quieres trabajar:",
-                 font=("Montserrat", 12), bg=FONDO, fg=TEXTO).pack(pady=(0, 10))
+    # ---------- barra lateral ----------
+    def _construir_barra_lateral(self):
+        lateral = tk.Frame(self.raiz, bg=LATERAL, width=196)
+        lateral.pack(side="left", fill="y")
+        lateral.pack_propagate(False)
 
-        botones = [
-            ("Ecuaciones Matriciales (Ax = b)", self.abrir_calculadora),
-            ("Vectores e Independencia Lineal", self.abrir_vectores),
-            ("Operaciones Matriciales", self.abrir_matrices_ops),
-            ("Determinantes y Propiedades", self.abrir_determinantes),
-            ("Factorización LU (Ax = b)", self.abrir_lu),
-            ("Métodos Numéricos", self.abrir_numericos),
-            ("Jacobi y Gauss-Seidel", self.abrir_iterativos),
-            ("Newton-Raphson (raíces)", self.abrir_newton),
-        ]
-        for texto, comando in botones:
-            tk.Button(self.frame_menu, text=texto, font=("Montserrat", 13, "bold"),
-                      bg=ACENTO, fg=FONDO, width=32, pady=7, relief="flat",
-                      cursor="hand2", activebackground=ACENTO_HOVER,
-                      activeforeground=FONDO, command=comando).pack(pady=5)
+        tk.Label(lateral, text="Calculadora de\nÁlgebra Lineal",
+                 font=(FUENTE_UI, 14, "bold"), bg=LATERAL, fg="#FFFFFF",
+                 justify="left").pack(anchor="w", padx=16, pady=(18, 2))
+        tk.Label(lateral, text="Grupo 2 · UAM · MTM0120",
+                 font=(FUENTE_UI, 8), bg=LATERAL, fg=LATERAL_SUAVE
+                 ).pack(anchor="w", padx=16, pady=(0, 16))
+        tk.Label(lateral, text="MÓDULOS", font=(FUENTE_UI, 8, "bold"),
+                 bg=LATERAL, fg=LATERAL_SUAVE).pack(anchor="w", padx=16,
+                                                    pady=(0, 4))
 
-    def abrir_calculadora(self):
-        self.frame_menu.pack_forget()
-        CalculadoraApp(self.raiz, callback_volver=self.mostrar_menu)
+        for numero, corto, _titulo, clave in self.MODULOS:
+            boton = tk.Label(lateral, text="  " + numero + " · " + corto,
+                             font=(FUENTE_UI, 10), bg=LATERAL,
+                             fg=LATERAL_TEXTO, anchor="w", padx=10, pady=7,
+                             cursor="hand2")
+            boton.pack(fill="x", padx=0)
+            # Se usa Label y no Button para poder pintar la fila entera
+            # cuando el módulo está activo, como una lista de navegación.
+            boton.bind("<Button-1>", lambda _e, c=clave: self.abrir(c))
+            boton.bind("<Enter>", lambda e, c=clave: self._resaltar(c, True))
+            boton.bind("<Leave>", lambda e, c=clave: self._resaltar(c, False))
+            self.botones_modulo[clave] = boton
 
-    def abrir_vectores(self):
-        self.frame_menu.pack_forget()
-        VectoresApp(self.raiz, callback_volver=self.mostrar_menu)
+        tk.Label(lateral, text="Inicio", font=(FUENTE_UI, 9, "underline"),
+                 bg=LATERAL, fg=LATERAL_SUAVE, cursor="hand2"
+                 ).pack(side="bottom", anchor="w", padx=16, pady=14)
+        lateral.winfo_children()[-1].bind("<Button-1>",
+                                          lambda _e: self.mostrar_inicio())
 
-    def abrir_matrices_ops(self):
-        self.frame_menu.pack_forget()
-        MatricesOpsApp(self.raiz, callback_volver=self.mostrar_menu)
+    def _resaltar(self, clave, encima):
+        """Aclara la fila bajo el cursor, salvo la del módulo abierto."""
+        if clave == self.clave_activa:
+            return
+        self.botones_modulo[clave].configure(
+            bg="#0A4F72" if encima else LATERAL)
 
-    def abrir_determinantes(self):
-        """Abre el resumen de teoremas del Módulo 4.
-        El motor de cálculo del módulo vive en modulos/modulo_determinantes.py
-        (cofactores, Sarrus y reducción a triangular). No tiene pantalla propia
-        porque opera sobre la misma matriz A que el resto de operaciones: sus
-        botones están en Operaciones Matriciales para no pedir la matriz dos
-        veces."""
-        mostrar_teoremas(self.raiz, "determinantes",
-                         "Módulo 4: Determinantes y Propiedades")
+    def _marcar_activo(self, clave):
+        for otra, boton in self.botones_modulo.items():
+            activo = (otra == clave)
+            boton.configure(bg=ACENTO if activo else LATERAL,
+                            fg="#FFFFFF" if activo else LATERAL_TEXTO,
+                            font=(FUENTE_UI, 10, "bold") if activo
+                            else (FUENTE_UI, 10))
+        self.clave_activa = clave
 
-    def abrir_lu(self):
-        """Abre la pantalla del Módulo 5: Factorización LU y solución A·x = b."""
-        self.frame_menu.pack_forget()
-        LUApp(self.raiz, callback_volver=self.mostrar_menu)
+    # ---------- contenido ----------
+    def _limpiar(self):
+        for hijo in self.contenido.winfo_children():
+            hijo.destroy()
 
-    def abrir_numericos(self):
-        """Abre el módulo de Métodos Numéricos del Programa 7."""
-        self.frame_menu.pack_forget()
-        MetodosNumericosApp(self.raiz, callback_volver=self.mostrar_menu)
+    def mostrar_inicio(self):
+        """Pantalla de bienvenida, con el contenido de cada módulo."""
+        self._limpiar()
+        self._marcar_activo(None)
+        marco = tk.Frame(self.contenido, bg=FONDO)
+        marco.pack(fill="both", expand=True, padx=40, pady=36)
 
-    def abrir_iterativos(self):
-        """Abre el módulo de Jacobi y Gauss-Seidel del Programa 8."""
-        self.frame_menu.pack_forget()
-        IterativosApp(self.raiz, callback_volver=self.mostrar_menu)
+        tk.Label(marco, text="¡Bienvenido a la mejor Calculadora!",
+                 font=(FUENTE_UI, 24, "bold"), bg=FONDO, fg=TEXTO,
+                 anchor="w").pack(fill="x")
+        tk.Label(marco, text="Elegí un módulo en la barra de la izquierda.",
+                 font=(FUENTE_UI, 11), bg=FONDO, fg=TEXTO_SUAVE,
+                 anchor="w").pack(fill="x", pady=(2, 20))
 
-    def abrir_newton(self):
-        """Abre el módulo de Newton-Raphson del Programa 9."""
-        self.frame_menu.pack_forget()
-        NewtonApp(self.raiz, callback_volver=self.mostrar_menu)
+        tarjetas = tk.Frame(marco, bg=FONDO)
+        tarjetas.pack(fill="both", expand=True)
+        for columna in range(2):
+            tarjetas.columnconfigure(columna, weight=1, uniform="col")
+        for indice, (numero, _corto, titulo, clave) in enumerate(self.MODULOS):
+            tarjeta = tk.Frame(tarjetas, bg=TARJETA, highlightbackground=BORDE,
+                               highlightthickness=1, cursor="hand2")
+            tarjeta.grid(row=indice // 2, column=indice % 2, sticky="nsew",
+                         padx=6, pady=6)
+            tk.Label(tarjeta, text="Módulo " + numero, font=(FUENTE_UI, 9),
+                     bg=TARJETA, fg=ACENTO, anchor="w"
+                     ).pack(fill="x", padx=14, pady=(10, 0))
+            tk.Label(tarjeta, text=titulo, font=(FUENTE_UI, 12, "bold"),
+                     bg=TARJETA, fg=TEXTO, anchor="w"
+                     ).pack(fill="x", padx=14, pady=(0, 12))
+            for widget in (tarjeta,) + tuple(tarjeta.winfo_children()):
+                widget.bind("<Button-1>", lambda _e, c=clave: self.abrir(c))
 
+        tk.Label(marco, text="Desarrollado por Grupo 2 • Universidad "
+                             "Americana (UAM)", font=(FUENTE_UI, 9),
+                 bg=FONDO, fg=TEXTO_SUAVE).pack(side="bottom", pady=(14, 0))
+
+    def abrir(self, clave):
+        """Dibuja el módulo pedido dentro del panel de contenido."""
+        self._limpiar()
+        self._marcar_activo(clave)
+        if clave == "determinantes":
+            # El Módulo 4 no tiene pantalla: su motor está en Operaciones
+            # Matriciales, así que se abre su resumen de teoremas.
+            mostrar_teoremas(self.raiz, "determinantes",
+                             "Módulo 4: Determinantes y Propiedades")
+            self.mostrar_inicio()
+            return
+        pantallas = {
+            "sistemas": CalculadoraApp,
+            "vectores": VectoresApp,
+            "matrices": MatricesOpsApp,
+            "lu": LUApp,
+            "numericos": MetodosNumericosApp,
+            "iterativos": IterativosApp,
+            "newton": NewtonApp,
+        }
+        pantallas[clave](self.contenido, callback_volver=self.mostrar_inicio)
+
+    # Nombre que usan los módulos al volver; se conserva por compatibilidad.
     def mostrar_menu(self):
-        for widget in self.raiz.winfo_children():
-            widget.destroy()
-        self.__init__(self.raiz)
+        self.mostrar_inicio()
 
     def _centrar_ventana(self):
         self.raiz.update_idletasks()
@@ -174,7 +245,6 @@ class MenuPrincipal:
         x = max(0, (self.raiz.winfo_screenwidth() - ancho) // 2)
         y = max(0, (self.raiz.winfo_screenheight() - alto) // 2)
         self.raiz.geometry(f"+{x}+{y}")
-
 
 
 
@@ -861,6 +931,22 @@ def ejecutar_pruebas():
         probar("No etiqueta como raiz una corrida detenida",
                "Ultima aproximacion" in resumen_cortado
                or "\u00daltima aproximaci\u00f3n" in resumen_cortado)
+
+        # El procedimiento debe traer los seis pasos de la Sesion 22 y
+        # respetar el orden en que se escribio la funcion.
+        desarrollo = "\n".join(pasos_procedimiento(convergente))
+        probar("El procedimiento desarrolla cada iteracion",
+               "ITERACI\u00d3N 1:" in desarrollo
+               and "6) \u00bfDetener?" in desarrollo
+               and "COMPROBACI\u00d3N FINAL" in desarrollo)
+        probar("La sustitucion respeta el orden escrito de f(x)",
+               "f(0.000000) = exp(-0.000000) - 0.000000" in desarrollo,
+               "no aparece la sustitucion literal")
+        probar("Desarrolla la cuenta termino a termino",
+               "f(0.000000) = 1.000000 - 0.000000 = 1.000000" in desarrollo)
+        corte = "\n".join(pasos_procedimiento(derivada_cero))
+        probar("El procedimiento explica por que se detuvo",
+               "El proceso se detiene." in corte)
 
         # La grafica debe dibujar una tangente por iteracion util.
         figura = crear_figura_newton(convergente)
